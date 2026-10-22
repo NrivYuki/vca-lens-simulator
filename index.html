@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VCA Lens Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+  /* 見た目の方針は design-ref/DESIGN.md（角は立てる・影は使わない・区切りは罫線・色はアクセント 1 色） */
+  :root {
+    --bg: #ffffff; --panel: #ffffff; --band: #f2f3f4; --ink: #1a1a1a; --ink-2: #3a3f44; --muted: #555b61;
+    --line: #c8ccd0; --line-light: #dde0e3;
+    --accent: #1f3a5f; --accent-ink: #ffffff; --link-hover: #0e1f36;
+    --warn-bg: #fff6df; --warn-ink: #5c4300; --err-bg: #fde8e8; --err-ink: #7a1a1a;
+    --stage: #e4e7ea; --paper: #ffffff; --draw: #1a1a1a; --dim: #3a3f44; --cut: #d0573f; --rim: #16181d;
+    --eyeR: #1f3a5f; --eyeL: #c2410c;
+    --bar: #3b3f45; --bar-2: #2a2d32; --bar-ink: #ffffff; --bar-muted: #c9cdd2; --tab: #e6e8ea;
+    --sky-top: #d4e2ef; --sky-bottom: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171c; --panel: #14171c; --band: #1d2127; --ink: #e6e8eb; --ink-2: #c4c9cf; --muted: #9aa1a9;
+      --line: #3a4048; --line-light: #2c3138;
+      --accent: #8fb0d6; --accent-ink: #0e1520; --link-hover: #b9cfe8;
+      --warn-bg: #352b10; --warn-ink: #f0d58f; --err-bg: #3a1c1c; --err-ink: #f2b6b6;
+      --stage: #0f1215; --paper: #181b20; --draw: #e6e8eb; --dim: #c4c9cf; --cut: #ef7a5f; --rim: #f2f4f7;
+      --eyeR: #8fb0d6; --eyeL: #fb923c;
+      --bar: #22262c; --bar-2: #101215; --bar-ink: #e6e8eb; --bar-muted: #9aa1a9; --tab: #22262c;
+      --sky-top: #1e2a38; --sky-bottom: #0f1215;
+    }
+  }
+  * { box-sizing: border-box; border-radius: 0; }
+  html, body { height: 100%; }
+  body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font: 14px/1.7 "Noto Sans JP", system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+  .mono, input[type=number], textarea { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
+  /* 上の帯：左に名前、右にいま表示している条件 */
+  header.top { display: flex; align-items: stretch; background: var(--bar); color: var(--bar-ink); border-bottom: 1px solid var(--bar-2); }
+  header.top h1 { flex: none; width: 370px; margin: 0; padding: 8px 16px; font-size: 15px; letter-spacing: 0.04em; background: var(--bar-2); }
+  header.top .spec { flex: 1; min-width: 0; padding: 8px 16px; font-size: 13px; color: var(--bar-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: center; }
+  .app { flex: 1; display: grid; grid-template-columns: 370px 1fr; min-height: 520px; }
+  aside.side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg); }
+  /* 設定のタブ：選んだタブだけ下の面とつながる */
+  .tabs { display: flex; flex: none; padding: 8px 8px 0; background: var(--band); border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; padding: 6px 0; margin-right: -1px; margin-bottom: -1px; font-size: 13px; color: var(--ink-2); background: var(--tab); border: 1px solid var(--line); }
+  .tabs button:hover { color: var(--ink); border-color: var(--line); background: var(--bg); }
+  .tabs button[aria-selected=true] { position: relative; color: var(--ink); font-weight: 700; background: var(--bg); border-top: 3px solid var(--accent); border-bottom-color: var(--bg); padding-top: 4px; }
+  .panes { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 32px; }
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  @media (max-width: 900px) {
+    body { display: block; }
+    .app { grid-template-columns: 1fr; }
+    .stage { order: -1; }
+    aside.side { border-right: 0; }
+    header.top { flex-wrap: wrap; }
+    header.top h1 { width: 100%; }
+    header.top .spec { white-space: normal; }
+    .panes { overflow: visible; }
+  }
+  .panel { margin-bottom: 24px; }
+  h2 { font-size: 15px; margin: 0 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); }
+  h3 { font-size: 13px; margin: 14px 0 4px; color: var(--muted); }
+  .panel p.muted { margin: 6px 0 0; }
+  button, .btn, select, input { font: inherit; }
+  button, .btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+  button:hover, .btn:hover { border-color: var(--ink); }
+  button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  input[type=number], input[type=text], select { width: 100%; padding: 3px 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input[type=number] { text-align: right; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 3px 4px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 500; font-size: 12px; background: var(--band); border-bottom: 1px solid var(--line); }
+  .rx { table-layout: fixed; }
+  .rx td:first-child { color: var(--muted); font-size: 12.5px; line-height: 1.3; width: 44%; }
+  .rx th:first-child { width: 44%; }
+  .res td { border-bottom: 1px solid var(--line-light); }
+  .res td small { color: var(--muted); }
+  .res td.left { text-align: left; }
+  .f { display: grid; grid-template-columns: 8.5em 1fr; gap: 6px; align-items: center; margin: 5px 0; }
+  .f > span { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row.pair { flex-wrap: nowrap; }
+  .mt { margin-top: 6px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  #sample { width: auto; }
+  #src { margin-top: 4px; }
+  #vcaOut { margin-top: 6px; }
+  #drop { border: 1px dashed var(--muted); padding: 10px; text-align: center; cursor: pointer; font-size: 13px; }
+  #drop.over { border: 1px solid var(--accent); background: var(--band); }
+  /* 知らせ：注意は色付きの地、エラーは太い枠、補足は枠だけ。色だけでなく形でも見分けられるようにする */
+  .msgs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; }
+  .msgs li { padding: 4px 8px; margin-top: 4px; border: 1px solid var(--line); }
+  .msgs li.w { background: var(--warn-bg); color: var(--warn-ink); border-color: currentColor; }
+  .msgs li.e { background: var(--err-bg); color: var(--err-ink); border: 2px solid currentColor; }
+  .msgs li.i { color: var(--ink-2); }
+  textarea { width: 100%; min-height: 92px; font-size: 12px; line-height: 1.4; background: var(--band); color: var(--ink); border: 1px solid var(--line); padding: 6px; }
+  .toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--band); }
+  .toolbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+  .toolbar select { width: auto; }
+  .toolbar label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink-2); font-size: 13px; }
+  .seg { display: inline-flex; }
+  .seg button { margin-left: -1px; }
+  .seg button:first-child { margin-left: 0; }
+  #clipPos { width: 120px; }
+  .view { position: relative; flex: 1; min-height: 0; background: var(--stage); }
+  #v3d { background: linear-gradient(var(--sky-top), var(--sky-bottom) 70%); }
+  /* 下の帯：左に主な結果、右に書き出しのボタン（絵と文字を縦に並べる） */
+  .bottombar { display: flex; flex: none; align-items: stretch; border-top: 1px solid var(--line); background: var(--bg); }
+  .bottombar .sum { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 20px; padding: 6px 14px; font-size: 13px; color: var(--ink-2); }
+  .bottombar .sum b { font: 500 14px "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--ink); }
+  .bottombar .sum .unit { color: var(--muted); font-size: 12px; }
+  .bottombar .actions { display: flex; flex: none; }
+  .bottombar .actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; padding: 6px 0; font-size: 11px; color: var(--ink-2); background: var(--bg); border: 0; border-left: 1px solid var(--line); }
+  .bottombar .actions button:hover { color: var(--ink); background: var(--band); }
+  .bottombar .actions svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  /* 狭い画面：表示の面の高さを確保し、下の帯のボタンは横幅いっぱいに並べる（上の基本の指定より後に置く） */
+  @media (max-width: 900px) {
+    .view { flex: none; height: 60vh; min-height: 300px; }
+    .bottombar { flex-wrap: wrap; }
+    .bottombar .actions { flex: 1 1 100%; border-top: 1px solid var(--line); }
+    .bottombar .actions button { flex: 1; width: auto; }
+    .bottombar .actions button:first-child { border-left: 0; }
+  }
+  #v3d canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  .hud { position: absolute; font-size: 12px; background: var(--panel); border: 1px solid var(--line); padding: 6px 9px; pointer-events: none; }
+  #legend { left: 10px; bottom: 10px; }
+  #legend .bar { width: 160px; height: 9px; margin: 3px 0; border: 1px solid var(--line); }
+  #legend .ends { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  #probe { right: 10px; top: 10px; min-width: 170px; display: none; font-variant-numeric: tabular-nums; }
+  #probe b { font-size: 15px; }
+  #hint { left: 10px; top: 10px; color: var(--muted); }
+  @media (max-width: 600px) { #hint { display: none; } }
+  #v2d { overflow: auto; padding: 12px; display: none; }
+  #v2d .sheet { background: var(--paper); border: 1px solid var(--line); margin: 0 auto; }
+  #v2d .sheet.fit { max-width: 1400px; }
+  #v2d .sheet svg { width: 100%; height: auto; display: block; }
+  svg.drawing .paper { fill: var(--paper); }
+  svg.drawing .ol { fill: none; stroke: var(--draw); stroke-linejoin: round; }
+  svg.drawing .th { fill: none; stroke: var(--draw); }
+  svg.drawing .bx { fill: none; stroke: var(--muted); stroke-width: .12; stroke-dasharray: 1 .6; }
+  svg.drawing .cl, svg.drawing .sl { fill: none; }
+  svg.drawing .dm { fill: none; stroke: var(--dim); }
+  svg.drawing .ah { fill: var(--dim); }
+  svg.drawing .ht { stroke: var(--cut); }
+  svg.drawing .sec { fill: url(#hatch); stroke: var(--draw); }
+  svg.drawing .mk { fill: var(--draw); }
+  svg.drawing .mk.thk { fill: var(--cut); }
+  svg.drawing .tx { fill: var(--ink); }
+  svg.drawing .tx.vt { font-size: 2.6px; font-weight: 600; }
+  svg.drawing .tx.ttl { font-size: 3.2px; font-weight: 700; }
+  svg.drawing .tx.sub { fill: var(--muted); }
+  svg.drawing .tx.em { font-weight: 600; }
+  svg.drawing .bd, svg.drawing .tb, svg.drawing .cpt { stroke: var(--draw); fill: none; }
+  svg.drawing .cp { stroke: var(--draw); }
+  svg.drawing .cl { stroke: var(--draw); }
+  #graph svg { width: 100%; height: auto; display: block; }
+  #graph .ax { stroke: var(--line); }
+  #graph .lb { fill: var(--muted); font-size: 10px; }
+  #graph .R { stroke: var(--eyeR); fill: none; stroke-width: 1.6; }
+  #graph .L { stroke: var(--eyeL); fill: none; stroke-width: 1.6; }
+  .key { display: inline-block; width: 10px; height: 3px; vertical-align: middle; margin-right: 3px; }
+  .key.R { background: var(--eyeR); }
+  .key.L { background: var(--eyeL); margin-left: 8px; }
+  .note { margin-top: 16px; background: var(--band); border: 1px solid var(--line); padding: 8px 10px; font-size: 12px; color: var(--ink-2); }
+  .note p { margin: 3px 0; }
+  a { color: var(--accent); }
+  a:hover { color: var(--link-hover); }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header class="top">
+  <h1>VCA Lens Simulator</h1>
+  <div class="spec" id="spec">玉形を読み込んでください</div>
+</header>
+<div class="app">
+  <aside class="side">
+    <div class="tabs" role="tablist" aria-label="設定">
+      <button role="tab" id="tab-shape" data-pane="shape" aria-controls="pane-shape" aria-selected="true">玉形</button>
+      <button role="tab" id="tab-rx" data-pane="rx" aria-controls="pane-rx" aria-selected="false" tabindex="-1">処方</button>
+      <button role="tab" id="tab-lens" data-pane="lens" aria-controls="pane-lens" aria-selected="false" tabindex="-1">加工</button>
+      <button role="tab" id="tab-res" data-pane="res" aria-controls="pane-res" aria-selected="false" tabindex="-1">結果</button>
+      <button role="tab" id="tab-tol" data-pane="tol" aria-controls="pane-tol" aria-selected="false" tabindex="-1">許容差</button>
+      <button role="tab" id="tab-vca" data-pane="vca" aria-controls="pane-vca" aria-selected="false" tabindex="-1">VCA</button>
+    </div>
+    <div class="panes">
+    <div class="panel" role="tabpanel" id="pane-shape" aria-labelledby="tab-shape">
+      <h2>玉形</h2>
+      <div id="drop">VCA ファイル（.vca / .oma / 中身が VCA の .job・.ptn）をここに置くか、クリックして選ぶ
+        <input type="file" id="file" hidden accept=".vca,.oma,.job,.ptn,.txt">
+      </div>
+      <div class="row mt">
+        <span class="muted">サンプル</span>
+        <select id="sample">
+          <option value="frame-both">両眼（frame-both）</option>
+          <option value="frame-right">右眼だけ（frame-right）</option>
+          <option value="frame-uneven">角度が不等間隔（frame-uneven）</option>
+          <option value="frame-3d">立体データ付き・処方入り（frame-3d）</option>
+          <option value="frame-rimless">縁なし・穴あけ（frame-rimless）</option>
+        </select>
+      </div>
+      <div id="src" class="muted"></div>
+      <ul class="msgs" id="loadMsgs"></ul>
+      <div class="note">
+        <p><strong>このツールの前提</strong></p>
+        <p>玉形と処方から、加工後のレンズの厚み・コバを 3D と三面図で確かめます。ファイルはブラウザの中だけで処理します。</p>
+        <p>前面は球面、後面は球面・トーリック（双円錐）として計算します。非球面・累進（フリーフォーム）の面、メーカーごとのベースカーブの選び方や加工機のヤゲンの決め方は再現できません。値は目安です。</p>
+        <p>角度（乱視軸・プリズムの基底方向・玉形）は、検者側から見て 0° が 3 時方向、反時計回りです（ISO 8429・DCS 5.4.10）。縁の加工の値は DCS の ETYP・BEVP・BEVM・BEVC・BEVANG・GWIDTH・GDEPTH に合わせています。準拠している規格は <a href="docs/standards.md">docs/standards.md</a> にまとめています。</p>
+      </div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="pane-rx" aria-labelledby="tab-rx" hidden>
+      <h2>処方とレイアウト</h2>
+      <table class="rx">
+        <thead><tr><th></th><th>右眼 R</th><th>左眼 L</th></tr></thead>
+        <tbody id="rxBody"></tbody>
+      </table>
+      <div class="f mt"><span>レンズ間距離 d（DBL）</span><input type="number" id="dbl" step="0.5" value="18"></div>
+      <div class="f"><span>プリズムの表し方</span>
+        <select id="prismMode">
+          <option value="360">360° 表示（基底方向）</option>
+          <option value="hv">水平・垂直（基底内方・上方を +）</option>
+        </select>
+      </div>
+      <p class="muted">角度は検者側から見て 3 時方向が 0°、反時計回り（ISO 8429・JIS T 7330）。ベースカーブ・中心厚を空欄にすると自動で決めます（ベースカーブは Vogel の式）。</p>
+    </div>
+
+    <div class="panel" role="tabpanel" id="pane-lens" aria-labelledby="tab-lens" hidden>
+      <h2>レンズと加工</h2>
+      <div class="f"><span>素材（屈折率）</span><select id="mat"></select></div>
+      <div class="f"><span>最小中心厚</span><input type="number" id="minCT" step="0.1" min="0.3"></div>
+      <div class="f"><span>最小縁厚</span><input type="number" id="minEdge" step="0.1" min="0.1" value="0.8"></div>
+      <div class="f"><span>縁の加工 ETYP</span>
+        <select id="edge">
+          <option value="bevel">1 ヤゲン（フルリム）</option>
+          <option value="mini">4 ミニヤゲン</option>
+          <option value="groove">3 溝掘り（ナイロール）</option>
+          <option value="flat">2 平（縁なし）</option>
+        </select>
+      </div>
+      <div class="f" id="modeRow"><span>位置の決め方 BEVP</span>
+        <select id="bevelMode">
+          <option value="percent">2 前面からの割合</option>
+          <option value="front">1 前面に沿う</option>
+          <option value="back">5 後面に沿う</option>
+          <option value="half">4 中央（50/50）</option>
+          <option value="frame">3 フレームカーブに沿う</option>
+          <option value="trace" id="traceOpt" disabled>トレーサーの立体データ（Z）に沿う</option>
+        </select>
+      </div>
+      <div class="f" id="mRow"><span id="mLabel">前面からの割合（%）</span><input type="number" id="bevelM" step="5" min="0" value="40"></div>
+      <div class="f" id="cRow"><span>沿わせるカーブ BEVC</span><input type="number" id="bevelC" step="0.25" min="0" placeholder="FCRV・前面カーブ"></div>
+      <div class="f" id="hRow"><span>ヤゲンの高さ・角度</span><div class="row pair"><input type="number" id="bevelH" step="0.1" min="0.2" value="0.6" title="高さ（mm）"><input type="number" id="bevelAngle" step="5" min="60" max="150" value="120" title="山の角度 BEVANG（°）"></div></div>
+      <div class="f" id="gRow"><span>溝の幅・深さ</span><div class="row pair"><input type="number" id="grooveW" step="0.1" min="0.2" value="0.6" title="幅 GWIDTH（mm）"><input type="number" id="grooveD" step="0.1" min="0.1" value="0.4" title="深さ GDEPTH（mm）"></div></div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="pane-res" aria-labelledby="tab-res" hidden>
+      <h2>結果</h2>
+      <table class="res">
+        <thead><tr><th></th><th>右眼 R</th><th>左眼 L</th></tr></thead>
+        <tbody id="resBody"></tbody>
+      </table>
+      <ul class="msgs" id="calcMsgs"></ul>
+      <h3>縁の厚み（角度ごと）</h3>
+      <div id="graph"></div>
+      <div class="muted"><span class="key R"></span>右眼 <span class="key L"></span>左眼　角度は 0° が 3 時方向、反時計回り（検者側から見る）</div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="pane-tol" aria-labelledby="tab-tol" hidden>
+      <h2>検査の許容差（JIS T 7337）</h2>
+      <table class="res">
+        <thead><tr><th></th><th>右眼 R</th><th>左眼 L</th></tr></thead>
+        <tbody id="tolBody"></tbody>
+      </table>
+      <p class="muted">枠入れ眼鏡レンズの規格（JIS T 7337:2020、対応国際規格 ISO 21987:2017）の表から求めた値です。プリズムインバランスの許容差は、プレンティスの式で左右合計の心取り誤差に直した目安も示します。</p>
+    </div>
+
+    <div class="panel" role="tabpanel" id="pane-vca" aria-labelledby="tab-vca" hidden>
+      <h2>厚みのレコード（VCA）</h2>
+      <p class="muted">加工後の厚みと縁の加工を VCA のレコードにしたものです。画面下の「VCA」で保存できます。</p>
+      <textarea id="vcaOut" readonly></textarea>
+    </div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="toolbar">
+      <div class="seg"><button id="tab3d" class="on">3D</button><button id="tab2d">三面図</button></div>
+      <span class="sep"></span>
+      <label>眼 <select id="eyes"><option value="RL">両眼</option><option value="R">右眼</option><option value="L">左眼</option></select></label>
+      <span class="g2d row" style="display:none">
+        <label>表示 <select id="zoom"><option value="fit">幅に合わせる</option><option value="100">実寸（A3）</option><option value="150">150%</option><option value="200">200%</option></select></label>
+      </span>
+      <span class="g3d row">
+        <span class="sep"></span>
+        <span class="seg" id="views">
+          <button data-v="front" title="検者側から">正面</button><button data-v="top">上</button><button data-v="right">右</button><button data-v="left">左</button><button data-v="bottom">下</button><button data-v="back" title="装用者側から">背面</button><button data-v="iso">斜め</button>
+        </span>
+        <button id="ortho" title="奥行きで縮まない表示（図面と同じ）">平行投影</button>
+        <button id="bevelSpin" title="ヤゲンが見やすい斜め上に向けて、レンズを自動で回し続ける。縁のヤゲンの立ち方を全周で確かめる">ヤゲン確認</button>
+        <label title="視点を固定し、ドラッグでレンズ自体を回す。光の当たり方でヤゲンの山が立って見える"><input type="checkbox" id="orbitLens">レンズを回す</label>
+        <button id="resetTilt" title="回したレンズの向きを 0° に戻す（視点はそのまま。装用状態の傾きは戻さない）">傾きを戻す</button>
+        <span class="sep"></span>
+        <label>表示 <select id="shade"><option value="heat">厚みの色分け</option><option value="solid">単色</option><option value="glass">半透明</option></select></label>
+        <label><input type="checkbox" id="lines" checked>稜線</label>
+        <label title="フレームのリムの太さは JIS に決まりが無いため、よくある太さの目安で描く">リム <select id="rim"><option value="metal">メタル</option><option value="cell">セル</option><option value="">なし</option></select></label>
+        <label><input type="checkbox" id="worn">装用状態</label>
+        <span class="sep"></span>
+        <label>断面 <select id="clip"><option value="">なし</option><option value="h">水平（A-A）</option><option value="v">垂直（B-B）</option><option value="radial">周（コバ・ヤゲン）</option></select></label>
+        <input type="range" id="clipPos" min="-35" max="35" step="0.1" value="0" disabled>
+      </span>
+    </div>
+    <div class="view" id="v3d">
+      <div class="hud" id="hint">ドラッグで回転・右ドラッグで移動・ホイールで拡大　クリックで厚みを測る</div>
+      <div class="hud" id="legend"><div>厚み（mm）</div><div class="bar" id="legendBar"></div><div class="ends"><span id="legMin"></span><span id="legMax"></span></div></div>
+      <div class="hud" id="probe"></div>
+    </div>
+    <div class="view" id="v2d"><div class="sheet" id="sheet"></div></div>
+    <div class="bottombar">
+      <div class="sum" id="sum"></div>
+      <div class="actions">
+      <button id="dlStl" title="3D の形を STL で保存"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3 4 7v10l8 4 8-4V7z M4 7l8 4 8-4 M12 11v10"/></svg><span>STL</span></button>
+      <button id="dlSvg" title="三面図を SVG で保存"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 12h8 M8 16h8"/></svg><span>SVG</span></button>
+      <button id="dlDxf" title="三面図を DXF で保存"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 17l3-6 3 4 2-2"/></svg><span>DXF</span></button>
+      <button id="print" title="三面図を A3 で印刷"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 9V3h10v6 M5 9h14v8h-2 M7 17H5V9 M7 14h10v7H7z"/></svg><span>印刷</span></button>
+      <button id="dlVca" title="厚みのレコードを VCA で保存"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 13h8 M8 17h5"/></svg><span>VCA</span></button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="vca-parser.js"></script>
+<script src="lens.js"></script>
+<script src="drawing.js"></script>
+<script src="sample-data.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = id => document.getElementById(id);
+const EYES = ['R', 'L'];
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// ---- 入力欄 -----------------------------------------------------------------
+const RX_ROWS = [
+  ['sph', 'SPH（D）', 0.25, { R: -4, L: -3.5 }],
+  ['cyl', 'CYL（D）', 0.25, { R: -1, L: -0.75 }],
+  ['ax', '乱視軸 AX（°）', 1, { R: 180, L: 10 }],
+  ['prism', 'プリズム（Δ）', 0.25, { R: 0, L: 0 }],
+  ['prismBase', '基底方向（°）', 1, { R: 0, L: 0 }],
+  ['ipd', '片眼 PD（単眼の心取り距離）', 0.5, { R: 31.5, L: 31 }],
+  ['ocht', '心取り点の高さ OCHT', 0.5, { R: 21, L: 21 }],
+  ['base', 'ベースカーブ（D）', 0.25, { R: '', L: '' }],
+  ['ct', '中心厚の指定（mm）', 0.1, { R: '', L: '' }],
+  ['panto', '前傾角 PANTO（°）', 0.5, { R: 9, L: 9 }],
+  ['faceform', 'そり角（°）', 0.5, { R: 5, L: 5 }],
+];
+$('rxBody').innerHTML = RX_ROWS.map(([k, label, step, def]) =>
+  `<tr><td id="lb-${k}">${label}</td>${EYES.map(e => `<td><input type="number" id="${e}-${k}" step="${step}" value="${def[e]}"${k === 'base' || k === 'ct' ? ' placeholder="自動"' : ''}></td>`).join('')}</tr>`).join('');
+
+// プリズムは 360° 表示（量と基底方向）か、水平・垂直の成分（基底内方・上方を +）で入れる
+const PRISM_LABELS = { '360': ['プリズム（Δ）', '基底方向（°）'], hv: ['水平（Δ、内方 +）', '垂直（Δ、上方 +）'] };
+function prismOf(e) {
+  const a = num(`${e}-prism`, 0), b = num(`${e}-prismBase`, 0);
+  if ($('prismMode').value === '360') return { prism: a, base: b };
+  return Lens.prismFromComponents(e, a, b);
+}
+function setPrism(e, prism, base) {
+  const r = v => Math.round(v * 100) / 100;
+  if ($('prismMode').value === '360') { $(`${e}-prism`).value = r(prism); $(`${e}-prismBase`).value = r(base); return; }
+  const c = Lens.prismToComponents(e, prism, base);
+  $(`${e}-prism`).value = r(c.h); $(`${e}-prismBase`).value = r(c.v);
+}
+let prismModeNow = '360';
+$('prismMode').addEventListener('change', () => {
+  // 今の入力を、前の表し方で読んでから新しい表し方で書き直す
+  const next = $('prismMode').value;
+  $('prismMode').value = prismModeNow;
+  const vals = EYES.map(e => prismOf(e));
+  $('prismMode').value = prismModeNow = next;
+  EYES.forEach((e, i) => setPrism(e, vals[i].prism, vals[i].base));
+  $('lb-prism').textContent = PRISM_LABELS[next][0]; $('lb-prismBase').textContent = PRISM_LABELS[next][1];
+  update(false);
+});
+$('mat').innerHTML = Lens.MATERIALS.map(m => `<option value="${m.id}"${m.id === '1.60' ? ' selected' : ''}>${m.name}</option>`).join('');
+const material = () => Lens.MATERIALS.find(m => m.id === $('mat').value);
+$('minCT').value = material().minCT;
+$('mat').addEventListener('change', () => { $('minCT').value = material().minCT; update(); });
+
+const num = (id, dflt) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : dflt; };
+
+// ---- 読み込み ---------------------------------------------------------------
+let job = null;
+function load(text, name) {
+  const d = Lens.fromVCA(text);
+  const msgs = [];
+  d.errors.forEach(s => msgs.push(['e', s]));
+  d.warnings.forEach(s => msgs.push(['w', s]));
+  if (!d.eyes.R) { show($('loadMsgs'), msgs); return; }
+  job = d;
+  // VCA にある値は入力欄に入れる（無い値は今の入力のまま）
+  for (const e of EYES) {
+    const eye = d.eyes[e];
+    if (!eye) continue;
+    if (eye.mirrored) msgs.push(['i', `${e === 'R' ? '右眼' : '左眼'}の玉形が無いので、反対の眼を左右反転して使います`]);
+    if (eye.offset > 0.05) msgs.push(['w', `${e}：半径の基準点が箱の中心から ${eye.offset.toFixed(2)} mm ずれていたので、箱の中心に合わせました`]);
+    const rx = eye.rx;
+    for (const k of ['sph', 'cyl', 'ax', 'ipd', 'ocht', 'ct']) if (rx[k] !== undefined) $(`${e}-${k}`).value = rx[k];
+    if (rx.prism !== undefined) setPrism(e, rx.prism, rx.prismBase || 0);
+    if (rx.front !== undefined) $(`${e}-base`).value = rx.front;
+    // 装用状態の角度（DCS の PANTO・CLZTILT。装用者で測った度）
+    const panto = VCA.sideNumber(d.rec.PANTO, e);
+    if (panto !== undefined) $(`${e}-panto`).value = panto;
+    const ff = VCA.sideNumber(d.rec.CLZTILT, e);
+    if (ff !== undefined) $(`${e}-faceform`).value = ff;
+    if (e === 'R' && rx.minCT !== undefined) $('minCT').value = rx.minCT;
+    if (e === 'R' && rx.minEdge !== undefined) $('minEdge').value = rx.minEdge;
+  }
+  if (d.dbl !== undefined) $('dbl').value = d.dbl;
+  // 縁の加工（DCS の ETYP・BEVP など）
+  const ETYP = { 1: 'bevel', 2: 'flat', 3: 'groove', 4: 'mini' };
+  if (ETYP[d.etyp]) $('edge').value = ETYP[d.etyp];
+  else if (d.etyp !== undefined && d.etyp !== -1) msgs.push(['w', `ETYP=${d.etyp} の縁の形には対応していないので、ヤゲンとして扱います`]);
+  const BEVP = { 1: 'front', 2: 'percent', 3: 'frame', 4: 'half', 5: 'back' };
+  const ed = d.edging;
+  if (BEVP[ed.bevp]) $('bevelMode').value = BEVP[ed.bevp];
+  else if (ed.bevp !== undefined) msgs.push(['i', `BEVP=${ed.bevp}（${ed.bevp === 7 ? '加工機の設定に従う' : '手動など'}）は再現できないので、前面からの割合で置きます`]);
+  if (ed.bevm !== undefined) $('bevelM').value = ed.bevm;
+  $('bevelC').value = ed.bevc !== undefined ? ed.bevc : (d.fcrv !== undefined ? d.fcrv : '');
+  if (ed.bevang !== undefined) $('bevelAngle').value = ed.bevang;
+  if (ed.gwidth !== undefined) $('grooveW').value = ed.gwidth;
+  if (ed.gdepth !== undefined) $('grooveD').value = ed.gdepth;
+  const sz = d.eyes.R;
+  const hasZ = !!sz.frameZ;
+  $('traceOpt').disabled = !hasZ;
+  if (!hasZ && $('bevelMode').value === 'trace') $('bevelMode').value = 'frame';
+  if (hasZ && ed.bevp === undefined) $('bevelMode').value = 'trace';
+  if (hasZ && !$('bevelC').value) $('bevelC').value = sz.frameCurve.toFixed(2);
+  $('src').textContent = `${name}：玉形幅 ${sz.hbox.toFixed(2)}　玉形高さ ${sz.vbox.toFixed(2)}　${sz.radii.length} 点に測り直し` +
+    (hasZ ? `　立体データ（Z）あり：フレームカーブ ${sz.frameCurve.toFixed(2)} D（球面を当てはめた値）` : '');
+  edgeRows();
+  show($('loadMsgs'), msgs);
+  update(true);
+}
+function show(ul, msgs) { ul.innerHTML = msgs.map(([c, s]) => `<li class="${c}">${s.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`).join(''); }
+
+function readFile(f) {
+  const r = new FileReader();
+  r.onload = () => load(VCA.bytesToString(new Uint8Array(r.result)), f.name);
+  r.readAsArrayBuffer(f);
+}
+$('drop').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => e.target.files[0] && readFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => $('drop').addEventListener(t, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => e.dataTransfer.files[0] && readFile(e.dataTransfer.files[0]));
+$('sample').addEventListener('change', () => load(window.SAMPLES[$('sample').value], `サンプル ${$('sample').value}.vca`));
+
+// ---- 計算 -------------------------------------------------------------------
+const models = {};
+function compute() {
+  const mat = material(), dbl = num('dbl', 18);
+  for (const e of EYES) {
+    const eye = job.eyes[e];
+    if (!eye) { delete models[e]; continue; }
+    const sph = num(`${e}-sph`, 0), cyl = num(`${e}-cyl`, 0);
+    const oc = Lens.opticalCenter(e, eye.hbox, eye.vbox, dbl, num(`${e}-ipd`, (eye.hbox + dbl) / 2), num(`${e}-ocht`, eye.vbox / 2));
+    const baseIn = parseFloat($(`${e}-base`).value);
+    const base = Number.isFinite(baseIn) && baseIn > 0 ? baseIn : Lens.autoBase(sph, cyl);
+    const pr = prismOf(e), ctIn = num(`${e}-ct`, 0);
+    const m = Lens.build(eye, {
+      sph, cyl, ax: num(`${e}-ax`, 0), prism: pr.prism, prismBase: pr.base,
+      n: mat.n, base, ocX: oc.x, ocY: oc.y,
+      minCT: num('minCT', mat.minCT), minEdge: num('minEdge', 0.8), ct: ctIn > 0 ? ctIn : undefined,
+      edge: $('edge').value, bevelMode: $('bevelMode').value, bevelM: num('bevelM', undefined),
+      bevelC: num('bevelC', undefined), bevelH: num('bevelH', undefined), bevelAngle: num('bevelAngle', 120),
+      grooveW: num('grooveW', 0.6), grooveD: num('grooveD', 0.4),
+    });
+    m.eye = e; m.dec = oc.dec; m.autoBase = !(Number.isFinite(baseIn) && baseIn > 0);
+    m.hbox = eye.hbox; m.vbox = eye.vbox;
+    m.panto = num(`${e}-panto`, 9); m.faceform = num(`${e}-faceform`, 5);   // 装用状態の傾き（度）
+    // 穴あけ（DRILLE）：位置と、そこでのレンズの厚み
+    m.drills = Lens.placeDrills(job.drills || [], e, eye.radii).map(g => Object.assign(g, { thick: m.thick(g.x, g.y) }));
+    const minDrl = VCA.sideNumber(job.rec.MINDRL, e);
+    for (const g of m.drills) {
+      const lo = g.minThk ?? minDrl, hi = g.maxThk ?? VCA.sideNumber(job.rec.MAXDRL, e);
+      if (lo !== undefined && g.thick < lo) m.warnings.push(`穴（x ${g.x.toFixed(1)}, y ${g.y.toFixed(1)}）の厚み ${g.thick.toFixed(2)} mm が最小 ${lo} mm より薄い`);
+      if (hi !== undefined && g.thick > hi) m.warnings.push(`穴（x ${g.x.toFixed(1)}, y ${g.y.toFixed(1)}）の厚み ${g.thick.toFixed(2)} mm が取付金具の最大 ${hi} mm より厚い`);
+    }
+    models[e] = m;
+  }
+}
+
+function update(refit) {
+  if (!job) return;
+  compute();
+  marker.visible = false; $('probe').style.display = 'none';
+  results();
+  graph();
+  build3D(refit);
+  if (tab === '2d') draw2D(); else dirty2D = true;
+}
+
+function results() {
+  const f = v => v.toFixed(2);
+  const cell = (fn) => EYES.map(e => `<td>${models[e] ? fn(models[e]) : '—'}</td>`).join('');
+  const rows = [
+    ['中心厚', m => f(m.ct)],
+    ['最厚の縁', m => `${f(m.thk.t)} <small>${Math.round(m.thk.a)}°</small>`],
+    ['最薄の縁', m => `${f(m.thn.t)} <small>${Math.round(m.thn.a)}°</small>`],
+    ['ベースカーブ', m => `${m.base.toFixed(2)}${m.autoBase ? ' <small>自動</small>' : ''}`],
+    ['後面カーブ', m => `${f(-m.c2x * 530)} / ${f(-m.c2y * 530)}`],
+    ['偏心（内方）', m => f(m.dec)],
+    ['有効直径 ED', m => f(m.ed)],
+    ['穴あけ（DRILLE）', m => (m.drills.length ? `${m.drills.length} か所 <small>最小厚 ${f(Math.min(...m.drills.map(g => g.thick)))}</small>` : '—')],
+    ['必要なブランク径', m => `${Math.ceil(m.maxDia + 2)} <small>以上</small>`],
+  ];
+  // 上の帯：いま表示している条件。下の帯：主な結果（右眼・左眼）
+  const m0 = models.R || models.L, opt = id => $(id).selectedOptions[0].textContent;
+  $('spec').textContent = [models.R && models.L ? '両眼' : models.R ? '右眼' : '左眼',
+    `玉形 ${m0.hbox.toFixed(1)}×${m0.vbox.toFixed(1)} mm`, `DBL ${$('dbl').value} mm`, opt('mat'), opt('edge')].join('／');
+  const pair = fn => EYES.filter(e => models[e]).map(e => `${e} <b>${fn(models[e])}</b>`).join('　');
+  $('sum').innerHTML = `<span>中心厚　${pair(m => f(m.ct))}</span><span>最厚の縁　${pair(m => f(m.thk.t))}</span><span>最薄の縁　${pair(m => f(m.thn.t))}　<span class="unit">mm</span></span>`;
+  $('resBody').innerHTML = rows.map(([label, fn]) => `<tr><td>${label}</td>${cell(fn)}</tr>`).join('') +
+    '<tr><td colspan="3" class="muted left">単位 mm。後面カーブは TIND 1.53 基準 D（乱視軸の向き / 直交する向き）。ブランク径は光学中心から最も遠い縁までの 2 倍＋2 mm</td></tr>';
+  const msgs = [];
+  for (const e of EYES) if (models[e]) models[e].warnings.forEach(s => msgs.push(['w', `${e === 'R' ? '右眼' : '左眼'}：${s}`]));
+  show($('calcMsgs'), msgs);
+
+  const recs = EYES.map(e => models[e] && Lens.records(models[e]));
+  const join = k => recs.map(r => (r ? r[k] : '?')).join(';');
+  const both = fn => EYES.map(e => (models[e] ? fn(models[e]) : '?')).join(';');
+  const ETYP = { bevel: 1, flat: 2, groove: 3, mini: 4 }, BEVP = { front: 1, percent: 2, frame: 3, trace: 3, half: 4, back: 5 };
+  const p = (models.R || models.L).params;
+  const lines = [
+    `LIND=${both(() => material().n.toFixed(2))}`,
+    `FRNT=${both(m => m.base.toFixed(2))}`,
+    ...['CTHICK', 'THKP', 'THKA', 'THKR', 'THNP', 'THNA', 'THNR'].map(k => `${k}=${join(k)}`),
+    `MINCTR=${both(() => num('minCT', 1).toFixed(2))}`,
+    `MINEDG=${both(() => num('minEdge', 0.8).toFixed(2))}`,
+    `ETYP=${ETYP[p.edge]}`,
+  ];
+  if (p.edge !== 'flat') {
+    lines.push(`BEVP=${BEVP[p.bevelMode]}`);
+    if (p.bevelMode !== 'half') lines.push(`BEVM=${(p.bevelM == null ? (p.bevelMode === 'percent' ? 40 : 1) : p.bevelM).toFixed(2)}`);
+    if (p.bevelMode === 'frame') lines.push(`BEVC=${(p.bevelC == null ? (models.R || models.L).base : p.bevelC).toFixed(2)}`);
+    // Z に沿う決め方は DCS に無いので、当てはめたフレームカーブで BEVP=3 として書く
+    if (p.bevelMode === 'trace') lines.push(`BEVC=${(job.eyes.R.frameCurve ?? (models.R || models.L).base).toFixed(2)}`);
+  }
+  if (p.vShape) lines.push(`BEVANG=${(p.bevelAngle || 120).toFixed(0)}`);
+  if (p.edge === 'groove') lines.push(`GWIDTH=${both(m => m.params.grooveW.toFixed(2))}`, `GDEPTH=${both(m => m.params.grooveD.toFixed(2))}`);
+  $('vcaOut').value = lines.join('\r\n') + '\r\n';
+  tolerancesTable();
+}
+
+// 枠入れ眼鏡レンズの許容差（JIS T 7337:2020 / ISO 21987:2017）
+let tol = null;
+function tolerancesTable() {
+  const rx = {};
+  for (const e of EYES) if (models[e]) { const p = models[e].params; rx[e] = { sph: p.sph, cyl: p.cyl, ax: p.ax, prism: p.prism, prismBase: p.prismBase }; }
+  tol = Lens.tolerances(rx);
+  const cell = fn => EYES.map(e => `<td>${tol.eyes[e] ? fn(tol.eyes[e]) : '—'}</td>`).join('');
+  const mm = v => (Number.isFinite(v) ? `±${v.toFixed(1)} mm` : '—');
+  const im = tol.imbalance;
+  $('tolBody').innerHTML = [
+    `<tr><td>後面頂点屈折力</td>${cell(t => `±${t.power.toFixed(2)} D`)}</tr>`,
+    `<tr><td>乱視屈折力</td>${cell(t => (t.cyl == null ? '—' : `±${t.cyl.toFixed(2)} D`))}</tr>`,
+    `<tr><td>乱視軸</td>${cell(t => (t.axis == null ? '規定なし' : `±${t.axis}°`))}</tr>`,
+    `<tr><td>中心厚</td><td colspan="2">±${tol.thickness} mm（5.4）</td></tr>`,
+    `<tr><td>プリズムインバランス</td><td colspan="2">水平 ${im.h.toFixed(2)}Δ・垂直 ${im.v.toFixed(2)}Δ <small>（表 5、S = ${im.S.toFixed(2)} D）</small></td></tr>`,
+    `<tr><td>心取り誤差の目安</td><td colspan="2">水平 ${mm(im.hMm)}・垂直 ${mm(im.vMm)} <small>（左右合計）</small></td></tr>`,
+    `<tr><td>フィッティングポイント</td><td colspan="2">±${tol.fitting.toFixed(1)} mm <small>（累進・姿勢指定付き単焦点、5.5.2）</small></td></tr>`,
+  ].join('');
+}
+
+function graph() {
+  const W = 320, H = 150, L = 30, B = 20, T = 8, Rr = 8;
+  let lo = Infinity, hi = -Infinity;
+  for (const e of EYES) if (models[e]) for (const p of models[e].edge) { lo = Math.min(lo, p.t); hi = Math.max(hi, p.t); }
+  lo = Math.floor(lo * 2) / 2; hi = Math.ceil(hi * 2) / 2; if (hi - lo < 1) hi = lo + 1;
+  const X = a => L + (a / 360) * (W - L - Rr), Y = t => T + (1 - (t - lo) / (hi - lo)) * (H - T - B);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="角度ごとの縁の厚み">`;
+  for (let a = 0; a <= 360; a += 90) s += `<line class="ax" x1="${X(a)}" y1="${T}" x2="${X(a)}" y2="${H - B}"/><text class="lb" x="${X(a)}" y="${H - 6}" text-anchor="middle">${a}°</text>`;
+  const step = (hi - lo) > 4 ? 1 : 0.5;
+  for (let t = lo; t <= hi + 1e-9; t += step) s += `<line class="ax" x1="${L}" y1="${Y(t)}" x2="${W - Rr}" y2="${Y(t)}"/><text class="lb" x="${L - 4}" y="${Y(t) + 3}" text-anchor="end">${t.toFixed(1)}</text>`;
+  for (const e of EYES) if (models[e]) {
+    const pts = models[e].edge.map(p => `${X(p.a).toFixed(1)},${Y(p.t).toFixed(1)}`).join(' ');
+    s += `<polyline class="${e}" points="${pts}"/>`;
+  }
+  $('graph').innerHTML = s + '</svg>';
+}
+
+// ---- 3D ---------------------------------------------------------------------
+const host = $('v3d');
+// 背景は透かして、下の .view の空色（CSS）を見せる
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+host.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8890a0, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(40, 60, 90); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.6); fill.position.set(-60, -20, -80); scene.add(fill);
+
+const persp = new THREE.PerspectiveCamera(30, 1, 0.1, 2000);
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -1000, 1000);
+let camera = persp;
+camera.position.set(60, 40, 120);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.12;
+controls.addEventListener('change', render);
+
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+const lensRoot = new THREE.Group();
+scene.add(lensRoot);
+// 画面の検査（tests/ui）から、計算の結果と 3D の置き方を読むための入口。画面の動きには使わない
+window.simInspect = { models, lensRoot, THREE };
+const marker = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false }));
+marker.renderOrder = 10; marker.visible = false; scene.add(marker);
+
+// 厚みの色（暗い紫 → 青緑 → 黄）
+const RAMP = ['#3b0f70', '#3b528b', '#21918c', '#5ec962', '#fde725'].map(c => new THREE.Color(c));
+function ramp(t) {
+  t = Math.min(1, Math.max(0, t)) * (RAMP.length - 1);
+  const i = Math.min(RAMP.length - 2, Math.floor(t));
+  return RAMP[i].clone().lerp(RAMP[i + 1], t - i);
+}
+$('legendBar').style.background = `linear-gradient(90deg, ${RAMP.map(c => '#' + c.getHexString()).join(',')})`;
+
+const shown = () => EYES.filter(e => models[e] && $('eyes').value.includes(e));
+const eyeOffset = e => {
+  if ($('eyes').value !== 'RL') return 0;
+  const dbl = num('dbl', 18);
+  return e === 'R' ? -(models.R.hbox + dbl) / 2 : (models.L.hbox + dbl) / 2;
+};
+const meshes = [];
+
+function build3D(refit) {
+  for (const c of [...lensRoot.children]) { lensRoot.remove(c); c.traverse(o => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); }); }
+  meshes.length = 0;
+  const list = shown();
+  let lo = Infinity, hi = -Infinity;
+  const geos = list.map(e => {
+    const g = Lens.mesh(models[e], { step: 2, rings: 32 });
+    for (const v of g.values) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    return [e, g];
+  });
+  if (hi - lo < 0.01) hi = lo + 0.01;
+  $('legMin').textContent = lo.toFixed(2); $('legMax').textContent = hi.toFixed(2);
+  const mode = $('shade').value, clipping = $('clip').value ? [clipPlane] : [];
+  $('legend').style.display = mode === 'heat' ? '' : 'none';
+  for (const [e, g] of geos) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(g.positions, 3));
+    const col = new Float32Array(g.values.length * 3);
+    g.values.forEach((v, i) => { const c = ramp((v - lo) / (hi - lo)); col.set([c.r, c.g, c.b], i * 3); });
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(g.indices, 1));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: mode === 'heat' ? 0xffffff : 0xa9c7e8, vertexColors: mode === 'heat',
+      roughness: 0.35, metalness: 0.05, clippingPlanes: clipping, side: THREE.FrontSide,
+      transparent: mode === 'glass', opacity: mode === 'glass' ? 0.35 : 1, depthWrite: mode !== 'glass',
+    });
+    const group = new THREE.Group();
+    group.position.x = eyeOffset(e);
+    if ($('worn').checked) {
+      // 装用状態：前傾角（x軸まわり、上端が手前）とそり角（y軸まわり、左右の耳側が顔側へ）
+      group.rotation.x = (models[e].panto || 0) * Math.PI / 180;
+      group.rotation.y = (e === 'R' ? -1 : 1) * (models[e].faceform || 0) * Math.PI / 180;
+    }
+    // フレーム基準：縁の面をまっすぐ立てる。計算は光軸が z 軸なので、光学中心をずらすと縁の面が傾く。
+    // その傾きを打ち消すようにレンズを回し、光軸のほうを傾けて見せる（玉形中心・縁の面の高さを軸に回す）
+    const pl = models[e].plane;
+    const lens = new THREE.Group();
+    lens.quaternion.setFromUnitVectors(new THREE.Vector3(-pl.a, -pl.b, 1).normalize(), new THREE.Vector3(0, 0, 1));
+    const pivot = new THREE.Vector3(0, 0, pl.c);
+    lens.position.copy(pivot).sub(pivot.clone().applyQuaternion(lens.quaternion));
+    group.add(lens);
+    const body = new THREE.Mesh(geo, mat);
+    body.userData.eye = e;
+    lens.add(body); meshes.push(body);
+    if (clipping.length) {
+      // 切り口：閉じた形の内側（裏面）を一色で塗ると、断面のふたに見える
+      lens.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: css('--cut'), side: THREE.BackSide, clippingPlanes: clipping })));
+    }
+    if ($('lines').checked) {
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 24), new THREE.LineBasicMaterial({ color: css('--draw'), transparent: true, opacity: 0.55, clippingPlanes: clipping }));
+      lens.add(edges);
+    }
+    // 穴あけ：穴の形をレンズの厚み方向に伸ばした暗い柱で表す（レンズからくり抜きはしない）
+    for (const g of models[e].drills) {
+      const sh = new THREE.Shape(Drawing.drillOutline(g, 32).map(([x, y]) => new THREE.Vector2(x, y)));
+      const zTop = models[e].zFront(g.x, g.y) + 0.15, zBot = models[e].zBack(g.x, g.y) - 0.15;
+      const geo2 = new THREE.ExtrudeGeometry(sh, { depth: zTop - zBot, bevelEnabled: false });
+      geo2.translate(0, 0, zBot);
+      lens.add(new THREE.Mesh(geo2, new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.8, clippingPlanes: clipping })));
+    }
+    const rimKind = $('rim').value;
+    if (rimKind && models[e].params.vShape) {
+      // リム：内側の V 溝にヤゲンの山がはまる枠を、縁に沿って掃引する。色は背景と反対（ライトは黒、ダークは白）
+      const metal = rimKind === 'metal';
+      lens.add(new THREE.Mesh(rimGeometry(models[e], RIM[rimKind]), new THREE.MeshStandardMaterial({
+        color: css('--rim'), roughness: metal ? 0.35 : 0.5, metalness: metal ? 0.3 : 0.05,
+        side: THREE.DoubleSide, clippingPlanes: clipping,
+      })));
+    }
+    lensRoot.add(group);
+  }
+  if (refit) setView(lastView);
+  updateClip();
+  render();
+}
+
+// リムの断面の大きさ（mm）。JIS B 7285（ISO 12870）・JIS B 7281（ISO 8624）にリムの太さの決まりは無いため、
+// よくあるフレームの目安にしている。w：前後の幅、out：ヤゲンの山から外側の面まで、ch：外側の角の面取り
+const RIM = {
+  metal: { w: 2.4, out: 1.2, ch: 0.3 },   // メタルのリム線（溝付きの線材）
+  cell: { w: 4.5, out: 4.0, ch: 0.8 },    // セル（アセテート）の枠
+};
+function rimGeometry(m, s) {
+  const gap = 0.05;                        // レンズとの隙間（重なってちらつかないように）
+  const ui = -m.bevelH + gap;              // 内側の面（ヤゲンの付け根の少し外）
+  const W = Math.max(s.w, m.bevelW + 0.6);
+  // 断面（u：縁の外向き、v：前後）。V 溝の開きは各位置のヤゲンの幅に合わせる
+  const profile = g => [
+    [ui, W / 2], [s.out - s.ch, W / 2], [s.out, W / 2 - s.ch], [s.out, -W / 2 + s.ch], [s.out - s.ch, -W / 2],
+    [ui, -W / 2], [ui, -g / 2], [gap, 0], [ui, g / 2], [ui, W / 2],
+  ];
+  const ed = m.edge.filter((x, i) => i % 2 === 0), N = ed.length;
+  const ax = ed.map(x => x.R * x.ca), ay = ed.map(x => x.R * x.sa);
+  const rings = ed.map((x, i) => {
+    // 外向きの向き：前後の点を結ぶ接線に垂直（玉形は反時計回りに並ぶ）
+    const j = (i + 1) % N, k = (i + N - 1) % N;
+    const tx = ax[j] - ax[k], ty = ay[j] - ay[k], l = Math.hypot(tx, ty) || 1;
+    const nx = ty / l, ny = -tx / l;
+    return profile(x.bevelW).map(([u, v]) => [ax[i] + u * nx, ay[i] + u * ny, x.zApex + v]);
+  });
+  // 断面の辺ごとに頂点を分け、角をはっきりさせる
+  const P = rings[0].length - 1, pos = [], idx = [];
+  for (let s2 = 0; s2 < P; s2++) {
+    const base = pos.length / 3;
+    for (let i = 0; i < N; i++) pos.push(...rings[i][s2], ...rings[i][s2 + 1]);
+    for (let i = 0; i < N; i++) {
+      const a = base + 2 * i, b = base + 2 * ((i + 1) % N);
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+let lastView = 'iso';
+const VIEWS = { front: [0, 0, 1], back: [0, 0, -1], top: [0, 1, 0.0005], bottom: [0, -1, 0.0005], right: [1, 0, 0], left: [-1, 0, 0], iso: [0.75, 0.55, 1.1], bevel: [0.45, 0.8, 0.6], edge: [1, 0, 0.18] };
+function setView(v) {
+  lastView = v;
+  const box = new THREE.Box3().setFromObject(lensRoot);
+  if (box.isEmpty()) return;
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const dir = new THREE.Vector3(...VIEWS[v]).normalize();
+  // 縦と横の狭いほうに収める（レンズは薄いので、外接球より少し寄せる）
+  const aspect = Math.max(0.2, host.clientWidth / Math.max(1, host.clientHeight));
+  const half = Math.min(persp.fov / 2 * Math.PI / 180, Math.atan(Math.tan(persp.fov / 2 * Math.PI / 180) * aspect));
+  const dist = sphere.radius * (aspect < 1 ? 1.15 : 0.85) / Math.sin(half);
+  controls.target.copy(sphere.center);
+  for (const cam of [persp, ortho]) {
+    cam.up.set(0, 1, 0);
+    cam.position.copy(sphere.center).addScaledVector(dir, dist);
+    cam.lookAt(sphere.center);
+  }
+  orthoSize = sphere.radius * 0.95 / Math.min(1, aspect);
+  ortho.zoom = 1;
+  resize();
+  document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  controls.update();
+  render();
+}
+let orthoSize = 40;
+
+// ---- ヤゲン確認：縁のヤゲンの立ち方を見る ----
+let lensDrag = null;            // 案2：手で回しているときの前回マウス位置（null = 回していない）
+let spinning = false;           // 案1：自動回転中か
+function spinLoop() {
+  // 案1：レンズをほぼ真横（エッジオン）に立て、光軸まわりに回す。縁の全周が順に上下へ流れ、各位置のコバ断面が見える
+  if (!spinning) return;
+  lensRoot.rotation.z += 0.012;
+  render();
+  requestAnimationFrame(spinLoop);
+}
+function stopSpin() {
+  spinning = false;
+  $('bevelSpin').classList.remove('on');
+}
+function setLensOrbit(on) {      // 案2：視点を固定して手でレンズを回すモード
+  if (on && spinning) stopSpin();  // 自動回転とは排他
+  controls.enableRotate = !on;    // カメラの回転を止め、ドラッグはレンズに回す
+  host.style.cursor = on ? 'grab' : '';
+}
+
+function resize() {
+  const w = host.clientWidth, h = host.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  persp.aspect = w / h; persp.updateProjectionMatrix();
+  const a = w / h;
+  ortho.left = -orthoSize * a; ortho.right = orthoSize * a; ortho.top = orthoSize; ortho.bottom = -orthoSize;
+  ortho.updateProjectionMatrix();
+  render();
+}
+// 利用者がまだ視点を動かしていなければ、大きさが変わったときに収め直す
+let touched = false;
+controls.addEventListener('start', () => { touched = true; });
+new ResizeObserver(() => (touched ? resize() : setView(lastView))).observe(host);
+
+// 向きの目印（右下の小さな軸）
+const gizmoScene = new THREE.Scene();
+const gizmoCam = new THREE.OrthographicCamera(-1.6, 1.6, 1.6, -1.6, -10, 10);
+function label(text, color) {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); g.fillStyle = color; g.font = 'bold 40px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 32, 34);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+  s.scale.set(0.55, 0.55, 1); return s;
+}
+for (const [v, color, text] of [[[1, 0, 0], '#e5484d', 'X'], [[0, 1, 0], '#30a46c', 'Y'], [[0, 0, 1], '#3e63dd', 'Z']]) {
+  const d = new THREE.Vector3(...v);
+  gizmoScene.add(new THREE.ArrowHelper(d, new THREE.Vector3(), 1, color, 0.25, 0.14));
+  const s = label(text, color); s.position.copy(d.clone().multiplyScalar(1.3)); gizmoScene.add(s);
+}
+
+let raf = 0;
+function render() {
+  if (raf) return;
+  raf = requestAnimationFrame(() => {
+    raf = 0;
+    if (tab !== '3d') return;
+    const w = host.clientWidth, h = host.clientHeight;
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, w, h);
+    renderer.render(scene, camera);
+    const s = Math.min(110, Math.min(w, h) * 0.22);
+    renderer.setScissorTest(true);
+    renderer.setScissor(w - s - 8, 8, s, s);
+    renderer.setViewport(w - s - 8, 8, s, s);
+    gizmoCam.position.set(0, 0, 0).sub(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(5));
+    gizmoCam.up.copy(camera.up);
+    gizmoCam.quaternion.copy(camera.quaternion);
+    const ac = renderer.autoClear; renderer.autoClear = false; renderer.clearDepth();
+    renderer.render(gizmoScene, gizmoCam);
+    renderer.autoClear = ac;
+    renderer.setScissorTest(false);
+    if (controls.enableDamping && controls.update()) render();
+  });
+}
+
+document.querySelectorAll('#views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+$('ortho').addEventListener('click', () => {
+  const toOrtho = camera === persp;
+  const next = toOrtho ? ortho : persp;
+  next.position.copy(camera.position); next.quaternion.copy(camera.quaternion); next.up.copy(camera.up);
+  if (toOrtho) {
+    // 今の見た目の大きさに合わせる
+    const d = camera.position.distanceTo(controls.target);
+    orthoSize = d * Math.tan((persp.fov / 2) * Math.PI / 180); ortho.zoom = 1;
+  } else {
+    const d = orthoSize / ortho.zoom / Math.tan((persp.fov / 2) * Math.PI / 180);
+    persp.position.copy(controls.target).addScaledVector(camera.getWorldDirection(new THREE.Vector3()).negate(), d);
+  }
+  camera = next; controls.object = camera;
+  $('ortho').classList.toggle('on', toOrtho);
+  resize(); controls.update(); render();
+});
+
+// 断面
+function updateClip() {
+  const mode = $('clip').value;
+  $('clipPos').disabled = !mode;
+  const v = parseFloat($('clipPos').value);
+  if (mode === 'h') clipPlane.set(new THREE.Vector3(0, -1, 0), v);
+  else if (mode === 'v') clipPlane.set(new THREE.Vector3(-1, 0, 0), v);
+  else if (mode === 'radial') {
+    // 周スイープ：レンズ中心を通り、方位角 v（度）を向く子午断面。縁のヤゲン断面がその角度で見える
+    const m = models[shown()[0]];
+    const cx = m ? m.ocX + eyeOffset(m.eye) : 0, cy = m ? m.ocY : 0;
+    const th = v * Math.PI / 180;
+    clipPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(Math.cos(th), Math.sin(th), 0), new THREE.Vector3(cx, cy, 0));
+  }
+}
+$('clip').addEventListener('change', () => {
+  const mode = $('clip').value, sl = $('clipPos');
+  if (mode === 'radial') {
+    sl.min = 0; sl.max = 360; sl.step = 1; sl.value = 0;   // スライダーを方位角（度）に
+  } else {
+    sl.min = -35; sl.max = 35; sl.step = 0.1;
+    // 最初は、表示している最初の眼の光学中心を通る位置にする
+    const m = models[shown()[0]];
+    if (m) sl.value = (mode === 'h' ? m.ocY : m.ocX + eyeOffset(m.eye)).toFixed(1);
+  }
+  build3D(false);
+});
+$('clipPos').addEventListener('input', () => { updateClip(); render(); });
+
+// クリックで厚みを測る（ドラッグしたときは測らない）
+const ray = new THREE.Raycaster();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  downAt = [e.clientX, e.clientY];
+  if ($('orbitLens').checked && e.button === 0) { lensDrag = [e.clientX, e.clientY]; renderer.domElement.setPointerCapture(e.pointerId); host.style.cursor = 'grabbing'; }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!lensDrag) return;
+  // 横ドラッグ＝鉛直軸まわり、縦ドラッグ＝水平軸まわり（手に取って回す感覚）
+  lensRoot.rotation.y += (e.clientX - lensDrag[0]) * 0.01;
+  lensRoot.rotation.x += (e.clientY - lensDrag[1]) * 0.01;
+  lensDrag = [e.clientX, e.clientY];
+  render();
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (lensDrag) { lensDrag = null; host.style.cursor = $('orbitLens').checked ? 'grab' : ''; }
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const hit = ray.intersectObjects(meshes, false).find(h => !$('clip').value || clipPlane.distanceToPoint(h.point) >= 0);
+  if (!hit) { marker.visible = false; $('probe').style.display = 'none'; render(); return; }
+  const m = models[hit.object.userData.eye];
+  const p = hit.object.parent.worldToLocal(hit.point.clone());
+  const a = Math.atan2(p.y, p.x), N = m.edge.length;
+  const ed = m.edge[((Math.round((a / (2 * Math.PI)) * N) % N) + N) % N];
+  const onEdge = Math.hypot(p.x, p.y) > ed.re - 0.25;
+  const t = onEdge ? ed.t : m.thick(p.x, p.y);
+  marker.position.copy(hit.point); marker.visible = true;
+  $('probe').style.display = 'block';
+  $('probe').innerHTML = `${m.eye === 'R' ? '右眼' : '左眼'}・${onEdge ? '縁（コバ）' : (hit.face.normal.z >= 0 ? '前面' : '後面')}<br>` +
+    `<b>${onEdge ? 'コバ厚' : '厚み'} ${t.toFixed(2)} mm</b><br>` +
+    (onEdge ? `角度 ${Math.round(ed.a)}°　玉形中心から ${ed.re.toFixed(1)} mm` : `位置 x ${p.x.toFixed(1)}　y ${p.y.toFixed(1)}（玉形中心から）`);
+  render();
+});
+
+// ---- 三面図 -----------------------------------------------------------------
+let tab = '3d', dirty2D = true;
+function drawEye() { const v = $('eyes').value; return v === 'L' ? 'L' : (models.R ? 'R' : 'L'); }
+const EDGE_NAMES = { bevel: 'ヤゲン', mini: 'ミニヤゲン', groove: '溝掘り', flat: '平（縁なし）' };
+const MODE_NAMES = { percent: '前面からの割合', front: '前面に沿う', back: '後面に沿う', half: '中央', frame: 'フレームカーブに沿う', trace: 'フレームの立体データに沿う' };
+function drawingSVG() {
+  const e = drawEye(), m = models[e], mat = material();
+  const p = m.params, f = v => (v >= 0 ? '+' : '') + v.toFixed(2);
+  const t = tol.eyes[e], im = tol.imbalance;
+  const pos = p.bevelMode === 'half' ? '' : p.bevelMode === 'percent' ? ` ${p.bevelM == null ? 40 : p.bevelM}%` : ` ${p.bevelM == null ? 1 : p.bevelM} mm`;
+  const edgeRow = p.edge === 'flat' ? ['縁の加工', '平（縁なし）', 'ETYP 2']
+    : p.edge === 'groove' ? ['溝 幅 × 深さ', `${p.grooveW.toFixed(1)} × ${p.grooveD.toFixed(1)}`, `${MODE_NAMES[p.bevelMode]}${pos}`]
+    : [EDGE_NAMES[p.edge], `高さ ${m.bevelH.toFixed(1)}  ${p.bevelAngle || 120}°`, `${MODE_NAMES[p.bevelMode]}${pos}`];
+  const d = new Date(), pad = v => String(v).padStart(2, '0');
+  return Drawing.threeView(m, {
+    eye: e,
+    title: `${e === 'R' ? '右眼' : '左眼'}レンズ　S ${f(p.sph)}  C ${f(p.cyl)}  AX ${Math.round(p.ax)}${p.prism ? `  ${(+p.prism).toFixed(2)}Δ B${Math.round(p.prismBase)}°` : ''}`,
+    number: `${jobName()}-${e}`,
+    material: `${mat.name}（n = ${mat.n.toFixed(2)}）`,
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    rows: [
+      edgeRow,
+      ['後面頂点屈折力', `±${t.power.toFixed(2)} D`, 'JIS T 7337 表 1'],
+      ['乱視軸', t.axis == null ? '規定なし' : `±${t.axis}°`, 'JIS T 7337 表 3'],
+      ['プリズムインバランス', `H ${im.h.toFixed(2)}Δ  V ${im.v.toFixed(2)}Δ`, 'JIS T 7337 表 5'],
+    ],
+    notes: ['許容差は JIS T 7337:2020（ISO 21987:2017）による'],
+  });
+}
+function draw2D() { if (!job) return; $('sheet').innerHTML = drawingSVG(); applyZoom(); dirty2D = false; }
+// 図面の表示倍率。実寸は A3（420 mm）の幅で表示する
+function applyZoom() {
+  const z = $('zoom').value, sheet = $('sheet');
+  sheet.classList.toggle('fit', z === 'fit');
+  sheet.style.width = z === 'fit' ? '' : `${(420 * +z) / 100}mm`;
+}
+$('zoom').addEventListener('change', applyZoom);
+// 印刷：A3 横の用紙に実寸で出す
+$('print').addEventListener('click', () => {
+  if (!job) return;
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>${jobName()}-${drawEye()}</title>` +
+    '<style>@page{size:A3 landscape;margin:0}html,body{margin:0}svg{display:block;width:420mm;height:297mm}</style></head><body>' +
+    Drawing.forExport(drawingSVG()).replace(/^<\?xml[^>]*>\s*/, '') + '</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+});
+function setTab(t) {
+  tab = t;
+  $('tab3d').classList.toggle('on', t === '3d'); $('tab2d').classList.toggle('on', t === '2d');
+  $('v3d').style.display = t === '3d' ? '' : 'none';
+  $('v2d').style.display = t === '2d' ? 'block' : 'none';
+  document.querySelectorAll('.g3d').forEach(el => { el.style.display = t === '3d' ? '' : 'none'; });
+  document.querySelectorAll('.g2d').forEach(el => { el.style.display = t === '2d' ? '' : 'none'; });
+  if (t === '2d' && dirty2D) draw2D();
+  if (t === '3d') resize();
+}
+$('tab3d').addEventListener('click', () => setTab('3d'));
+$('tab2d').addEventListener('click', () => setTab('2d'));
+
+// ---- 書き出し ---------------------------------------------------------------
+function download(name, data, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const jobName = () => (job && job.rec.JOB && job.rec.JOB[0]) || 'lens';
+$('dlSvg').addEventListener('click', () => job && download(`${jobName()}-${drawEye()}.svg`, Drawing.forExport(drawingSVG()), 'image/svg+xml'));
+$('dlDxf').addEventListener('click', () => job && download(`${jobName()}-${drawEye()}.dxf`, Drawing.toDXF(drawingSVG()), 'application/dxf'));
+$('dlVca').addEventListener('click', () => job && download(`${jobName()}-thickness.vca`, $('vcaOut').value, 'text/plain'));
+$('dlStl').addEventListener('click', () => {
+  if (!job) return;
+  const parts = shown().map(e => [Lens.mesh(models[e], { step: 1, rings: 48 }), eyeOffset(e)]);
+  const count = parts.reduce((s, [g]) => s + g.indices.length / 3, 0);
+  const buf = new ArrayBuffer(84 + count * 50), dv = new DataView(buf);
+  dv.setUint32(80, count, true);
+  let o = 84;
+  for (const [g, dx] of parts) {
+    const P = i => [g.positions[i * 3] + dx, g.positions[i * 3 + 1], g.positions[i * 3 + 2]];
+    for (let t = 0; t < g.indices.length; t += 3) {
+      const a = P(g.indices[t]), b = P(g.indices[t + 1]), c = P(g.indices[t + 2]);
+      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const l = Math.hypot(...n) || 1;
+      for (const x of [n[0] / l, n[1] / l, n[2] / l, ...a, ...b, ...c]) { dv.setFloat32(o, x, true); o += 4; }
+      o += 2;
+    }
+  }
+  download(`${jobName()}.stl`, buf, 'model/stl');
+});
+
+// ---- 入力の変更 -------------------------------------------------------------
+// 縁の加工の入力欄：加工の種類と位置の決め方に合う欄だけ見せる
+const M_LABELS = { percent: '前面からの割合（%）BEVM', front: '前面から（mm）BEVM', back: '後面から（mm）BEVM', frame: '前面から（mm）BEVM', trace: '前面から（mm）BEVM' };
+const M_DEFAULTS = { percent: 40, front: 1, back: 1, frame: 1, trace: 1.2 };
+const edgeRows = () => {
+  const t = $('edge').value, mode = $('bevelMode').value, show = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+  show('modeRow', t !== 'flat'); show('mRow', t !== 'flat' && mode !== 'half'); show('cRow', t !== 'flat' && mode === 'frame');
+  show('hRow', t === 'bevel' || t === 'mini'); show('gRow', t === 'groove');
+  $('mLabel').textContent = M_LABELS[mode] || '';
+};
+$('edge').addEventListener('change', () => { $('bevelH').value = $('edge').value === 'mini' ? 0.4 : 0.6; });
+$('bevelMode').addEventListener('change', () => { $('bevelM').value = M_DEFAULTS[$('bevelMode').value] ?? ''; $('bevelM').step = $('bevelMode').value === 'percent' ? 5 : 0.1; });
+document.querySelectorAll('aside input[type=number], #edge, #bevelMode').forEach(el => el.addEventListener('input', () => { edgeRows(); update(false); }));
+document.querySelectorAll('#edge, #bevelMode').forEach(el => el.addEventListener('change', () => { edgeRows(); update(false); }));
+$('eyes').addEventListener('change', () => { build3D(true); if (tab === '2d') draw2D(); else dirty2D = true; });
+$('shade').addEventListener('change', () => build3D(false));
+$('lines').addEventListener('change', () => build3D(false));
+$('rim').addEventListener('change', () => build3D(false));
+
+// 左の設定のタブ
+const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
+function showPane(btn) {
+  for (const b of tabs) {
+    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    b.tabIndex = b === btn ? 0 : -1;
+    $('pane-' + b.dataset.pane).hidden = b !== btn;
+  }
+  document.querySelector('.panes').scrollTop = 0;
+}
+tabs.forEach((b, i) => {
+  b.addEventListener('click', () => showPane(b));
+  b.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (d) { const n = tabs[(i + d + tabs.length) % tabs.length]; showPane(n); n.focus(); }
+  });
+});
+$('bevelSpin').addEventListener('click', () => {
+  // 案1：レンズを正面に立てて、縦軸まわりに自動で回す（もう一度押すと止まる）
+  if (spinning) { stopSpin(); return; }
+  if ($('orbitLens').checked) { $('orbitLens').checked = false; setLensOrbit(false); }  // 手回しとは排他
+  lensRoot.rotation.set(0, 0, 0);
+  setView('edge');      // レンズをほぼ真横（エッジオン）に立てる
+  spinning = true;
+  $('bevelSpin').classList.add('on');
+  spinLoop();
+});
+$('resetTilt').addEventListener('click', () => {
+  // レンズの回転だけを 0 に戻す。視点ボタンは傾きを保ったまま見るのに使えるので、戻すのはこのボタンだけ
+  if (spinning) stopSpin();
+  lensRoot.rotation.set(0, 0, 0);
+  setView(lastView);
+});
+$('orbitLens').addEventListener('change', () => {
+  const on = $('orbitLens').checked;
+  setLensOrbit(on);
+  if (!on) { lensRoot.rotation.set(0, 0, 0); render(); }   // モードを抜けたらレンズを正位置へ
+});
+$('worn').addEventListener('change', () => {
+  // 装用状態にするときは、両眼がそろっていれば両眼表示にして正面から見る
+  if ($('worn').checked && $('eyes').value !== 'RL' && models.R && models.L) $('eyes').value = 'RL';
+  build3D(true);
+  setView($('worn').checked ? 'front' : lastView);
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { build3D(false); });
+edgeRows();
+load(window.SAMPLES['frame-both'], 'サンプル frame-both.vca');
+window.__sim = { models, setView, setTab };
+</script>
+</body>
+</html>

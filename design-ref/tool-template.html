@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[ツール名]</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<!--
+  ツール画面のテンプレート（VCA Lens Simulator・VCA Shape Maker と同じ作り）
+  上の帯：名前と、いま表示している条件
+  左：設定をタブで切り替える
+  右：ツールバー・表示の面・下の帯（主な結果と書き出しのボタン）
+  文言は [ ] を差し替える。方針は DESIGN.md の §9。
+-->
+<style>
+  :root {
+    --bg: #ffffff; --panel: #ffffff; --band: #f2f3f4; --ink: #1a1a1a; --ink-2: #3a3f44; --muted: #555b61;
+    --line: #c8ccd0; --line-light: #dde0e3;
+    --accent: #1f3a5f; --accent-ink: #ffffff; --link-hover: #0e1f36;
+    --warn-bg: #fff6df; --warn-ink: #5c4300; --err-bg: #fde8e8; --err-ink: #7a1a1a;
+    --stage: #e4e7ea; --sky-top: #d4e2ef; --sky-bottom: #ffffff;
+    --bar: #3b3f45; --bar-2: #2a2d32; --bar-ink: #ffffff; --bar-muted: #c9cdd2; --tab: #e6e8ea;
+    --side-w: 370px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171c; --panel: #14171c; --band: #1d2127; --ink: #e6e8eb; --ink-2: #c4c9cf; --muted: #9aa1a9;
+      --line: #3a4048; --line-light: #2c3138;
+      --accent: #8fb0d6; --accent-ink: #0e1520; --link-hover: #b9cfe8;
+      --warn-bg: #352b10; --warn-ink: #f0d58f; --err-bg: #3a1c1c; --err-ink: #f2b6b6;
+      --stage: #0f1215; --sky-top: #1e2a38; --sky-bottom: #0f1215;
+      --bar: #22262c; --bar-2: #101215; --bar-ink: #e6e8eb; --bar-muted: #9aa1a9; --tab: #22262c;
+    }
+  }
+  * { box-sizing: border-box; border-radius: 0; }
+  html, body { height: 100%; }
+  body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font: 14px/1.7 "Noto Sans JP", system-ui, "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+  .mono, input[type=number], textarea { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
+  a { color: var(--accent); }
+  a:hover { color: var(--link-hover); }
+
+  /* 上の帯：左に名前、右にいま表示している条件 */
+  header.top { display: flex; align-items: stretch; background: var(--bar); color: var(--bar-ink); border-bottom: 1px solid var(--bar-2); }
+  header.top h1 { flex: none; width: var(--side-w); margin: 0; padding: 8px 16px; font-size: 15px; letter-spacing: 0.04em; background: var(--bar-2); }
+  header.top .spec { flex: 1; min-width: 0; padding: 8px 16px; font-size: 13px; color: var(--bar-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: center; }
+
+  .app { flex: 1; display: grid; grid-template-columns: var(--side-w) 1fr; min-height: 520px; }
+
+  /* 左：設定のタブ。選んだタブだけ下の面とつながる */
+  aside.side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg); }
+  .tabs { display: flex; flex: none; padding: 8px 8px 0; background: var(--band); border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; padding: 6px 0; margin-right: -1px; margin-bottom: -1px; font-size: 13px; color: var(--ink-2); background: var(--tab); border: 1px solid var(--line); }
+  .tabs button:hover { color: var(--ink); border-color: var(--line); background: var(--bg); }
+  .tabs button[aria-selected=true] { color: var(--ink); font-weight: 700; background: var(--bg); border-top: 3px solid var(--accent); border-bottom-color: var(--bg); padding-top: 4px; }
+  .panes { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 32px; }
+  .panel { margin-bottom: 24px; }
+  h2 { font-size: 15px; margin: 0 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--ink); }
+  h3 { font-size: 13px; margin: 14px 0 4px; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 12px; }
+  .panel p.muted { margin: 6px 0 0; }
+
+  /* 入力 */
+  button, select, input, textarea { font: inherit; }
+  button { border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 4px 10px; cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--ink); }
+  button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  input[type=number], input[type=text], select { width: 100%; padding: 3px 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input[type=number] { text-align: right; font-size: 13px; }
+  textarea { width: 100%; min-height: 92px; font-size: 12px; line-height: 1.4; background: var(--band); color: var(--ink); border: 1px solid var(--line); padding: 6px; }
+  .f { display: grid; grid-template-columns: 8.5em 1fr; gap: 6px; align-items: center; margin: 5px 0; }
+  .f > span { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #drop { border: 1px dashed var(--muted); padding: 10px; text-align: center; cursor: pointer; font-size: 13px; }
+
+  /* 表 */
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 3px 4px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 500; font-size: 12px; background: var(--band); border-bottom: 1px solid var(--line); }
+  tbody td { border-bottom: 1px solid var(--line-light); }
+
+  /* 知らせ：注意は色付きの地、エラーは太い枠、補足は枠だけ。色だけでなく形でも見分けられるようにする */
+  .msgs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 12px; }
+  .msgs li { padding: 4px 8px; margin-top: 4px; border: 1px solid var(--line); }
+  .msgs li.w { background: var(--warn-bg); color: var(--warn-ink); border-color: currentColor; }
+  .msgs li.e { background: var(--err-bg); color: var(--err-ink); border: 2px solid currentColor; }
+  .msgs li.i { color: var(--ink-2); }
+  .note { margin-top: 16px; background: var(--band); border: 1px solid var(--line); padding: 8px 10px; font-size: 12px; color: var(--ink-2); }
+  .note p { margin: 3px 0; }
+
+  /* 右：ツールバー・表示の面・下の帯 */
+  .stage { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 8px 10px; border-bottom: 1px solid var(--line); background: var(--band); }
+  .toolbar .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+  .toolbar select { width: auto; }
+  .toolbar label { display: inline-flex; gap: 4px; align-items: center; color: var(--ink-2); font-size: 13px; }
+  .seg { display: inline-flex; }
+  .seg button { margin-left: -1px; }
+  .seg button:first-child { margin-left: 0; }
+  .view { position: relative; flex: 1; min-height: 0; background: var(--stage); }
+  .view.sky { background: linear-gradient(var(--sky-top), var(--sky-bottom) 70%); }   /* 3D を置く面だけ空色にする */
+  .hud { position: absolute; font-size: 12px; background: var(--panel); border: 1px solid var(--line); padding: 6px 9px; pointer-events: none; }
+  .hud.tl { left: 10px; top: 10px; }
+  .placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; }
+  .bottombar { display: flex; flex: none; align-items: stretch; border-top: 1px solid var(--line); background: var(--bg); }
+  .bottombar .sum { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 20px; padding: 6px 14px; font-size: 13px; color: var(--ink-2); }
+  .bottombar .sum b { font: 500 14px "IBM Plex Mono", ui-monospace, Consolas, monospace; color: var(--ink); }
+  .bottombar .sum .unit { color: var(--muted); font-size: 12px; }
+  .bottombar .actions { display: flex; flex: none; }
+  .bottombar .actions button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 64px; padding: 6px 0; font-size: 11px; color: var(--ink-2); background: var(--bg); border: 0; border-left: 1px solid var(--line); }
+  .bottombar .actions button:hover { color: var(--ink); background: var(--band); }
+  .bottombar .actions svg { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+
+  /* 狭い画面：表示の面を上、設定を下に積む */
+  @media (max-width: 900px) {
+    body { display: block; }
+    .app { grid-template-columns: 1fr; }
+    .stage { order: -1; }
+    .view { flex: none; height: 60vh; min-height: 300px; }
+    aside.side { border-right: 0; }
+    .panes { overflow: visible; }
+    header.top { flex-wrap: wrap; }
+    header.top h1 { width: 100%; }
+    header.top .spec { white-space: normal; }
+    .bottombar { flex-wrap: wrap; }
+    .bottombar .actions { flex: 1 1 100%; border-top: 1px solid var(--line); }
+    .bottombar .actions button { flex: 1; width: auto; }
+    .bottombar .actions button:first-child { border-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>[ツール名]</h1>
+  <div class="spec" id="spec">[いまの条件 1]／[条件 2]／[条件 3]</div>
+</header>
+<div class="app">
+  <aside class="side">
+    <div class="tabs" role="tablist" aria-label="設定">
+      <button role="tab" id="tab-a" data-pane="a" aria-controls="pane-a" aria-selected="true">[タブ1]</button>
+      <button role="tab" id="tab-b" data-pane="b" aria-controls="pane-b" aria-selected="false" tabindex="-1">[タブ2]</button>
+      <button role="tab" id="tab-c" data-pane="c" aria-controls="pane-c" aria-selected="false" tabindex="-1">[タブ3]</button>
+      <button role="tab" id="tab-d" data-pane="d" aria-controls="pane-d" aria-selected="false" tabindex="-1">[タブ4]</button>
+    </div>
+    <div class="panes">
+      <div class="panel" role="tabpanel" id="pane-a" aria-labelledby="tab-a">
+        <h2>[読み込み]</h2>
+        <div id="drop">[ファイル] をここに置くか、クリックして選ぶ</div>
+        <ul class="msgs">
+          <li class="i">[補足の知らせ]</li>
+          <li class="w">[注意の知らせ]</li>
+          <li class="e">[エラーの知らせ]</li>
+        </ul>
+        <div class="note">
+          <p><strong>このツールの前提</strong></p>
+          <p>[何を・どこまで計算するか。できないこと。値は目安かどうか]</p>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="pane-b" aria-labelledby="tab-b" hidden>
+        <h2>[入力]</h2>
+        <div class="f"><span>[項目]</span><input type="number" value="0"></div>
+        <div class="f"><span>[項目]</span><select><option>[選択肢]</option></select></div>
+        <div class="f"><span>[項目]</span><input type="text" value=""></div>
+        <p class="muted">[単位・向きなどの決まり]</p>
+      </div>
+
+      <div class="panel" role="tabpanel" id="pane-c" aria-labelledby="tab-c" hidden>
+        <h2>[結果]</h2>
+        <table>
+          <thead><tr><th></th><th>[列1]</th><th>[列2]</th></tr></thead>
+          <tbody>
+            <tr><td>[項目]</td><td>0.00</td><td>0.00</td></tr>
+            <tr><td>[項目]</td><td>0.00</td><td>0.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel" role="tabpanel" id="pane-d" aria-labelledby="tab-d" hidden>
+        <h2>[書き出し]</h2>
+        <p class="muted">画面下のボタンで保存できます。</p>
+        <textarea readonly>[書き出す中身]</textarea>
+      </div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="toolbar">
+      <div class="seg"><button class="on">[表示1]</button><button>[表示2]</button></div>
+      <span class="sep"></span>
+      <label>[切り替え] <select><option>[選択肢]</option></select></label>
+      <label><input type="checkbox" checked>[表示の項目]</label>
+    </div>
+    <div class="view sky">
+      <div class="placeholder">[3D・図・画像を置く面]</div>
+      <div class="hud tl">[操作の案内]</div>
+    </div>
+    <div class="bottombar">
+      <div class="sum"><span>[主な結果] <b>0.00</b></span><span>[主な結果] <b>0.00</b></span><span class="unit">[単位]</span></div>
+      <div class="actions">
+        <button title="[保存の説明]"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 4v11 M7 10l5 5 5-5 M5 20h14"/></svg><span>保存</span></button>
+        <button title="[コピーの説明]"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 9h10v12H9z M5 15V3h10v2"/></svg><span>コピー</span></button>
+        <button title="[印刷の説明]"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M7 9V3h10v6 M5 9h14v8h-2 M7 17H5V9 M7 14h10v7H7z"/></svg><span>印刷</span></button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// 左の設定のタブ（左右の矢印キーでも切り替える）
+const tabs = [...document.querySelectorAll('.tabs [role=tab]')];
+function showPane(btn) {
+  for (const b of tabs) {
+    b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    b.tabIndex = b === btn ? 0 : -1;
+    document.getElementById('pane-' + b.dataset.pane).hidden = b !== btn;
+  }
+  document.querySelector('.panes').scrollTop = 0;
+}
+tabs.forEach((b, i) => {
+  b.addEventListener('click', () => showPane(b));
+  b.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (d) { const n = tabs[(i + d + tabs.length) % tabs.length]; showPane(n); n.focus(); }
+  });
+});
+</script>
+</body>
+</html>
