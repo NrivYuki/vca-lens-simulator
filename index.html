@@ -197,6 +197,7 @@
       <div class="row mt">
         <span class="muted">サンプル</span>
         <select id="sample">
+          <option value="_SAMPLE0001">両眼・1440 点（_SAMPLE0001）</option>
           <option value="frame-both">両眼（frame-both）</option>
           <option value="frame-right">右眼だけ（frame-right）</option>
           <option value="frame-uneven">角度が不等間隔（frame-uneven）</option>
@@ -1104,7 +1105,7 @@ $('worn').addEventListener('change', () => {
 });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { build3D(false); });
 edgeRows();
-load(window.SAMPLES['frame-both'], 'サンプル frame-both.vca');
+load(window.SAMPLES['_SAMPLE0001'], 'サンプル _SAMPLE0001.vca');
 window.__sim = { models, setView, setTab };
 </script>
 </body>

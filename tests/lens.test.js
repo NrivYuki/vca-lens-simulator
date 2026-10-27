@@ -97,6 +97,17 @@ test('VCA のサンプルから両眼の玉形を読み込める', () => {
   const one = Lens.fromVCA(fs.readFileSync(path.join(__dirname, '../samples/frame-right.vca'), 'latin1'));
   assert.ok(one.eyes.L.mirrored);
   near(one.eyes.L.hbox, one.eyes.R.hbox, 0.01);
+  // 1440 点のサンプル（vca-ptn-converter と同じもの）。計算では 360 点に測り直す
+  const big = Lens.fromVCA(fs.readFileSync(path.join(__dirname, '../samples/_SAMPLE0001.vca'), 'latin1'));
+  assert.deepStrictEqual(big.errors, []);
+  for (const e of ['R', 'L']) { near(big.eyes[e].hbox, 52.0, 0.05, `${e} の HBOX`); near(big.eyes[e].vbox, 45.85, 0.05, `${e} の VBOX`); }
+  assert.ok(!big.eyes.L.mirrored, '左眼もファイルにある');
+  // 画面のサンプル（sample-data.js）は samples/ のファイルと同じ中身
+  const g = {};
+  new Function('window', fs.readFileSync(path.join(__dirname, '../sample-data.js'), 'utf8'))(g);
+  const files = fs.readdirSync(path.join(__dirname, '../samples')).map(f => f.replace(/\.vca$/, '')).sort();
+  assert.deepStrictEqual(Object.keys(g.SAMPLES).sort(), files);
+  for (const k of files) assert.strictEqual(g.SAMPLES[k], fs.readFileSync(path.join(__dirname, `../samples/${k}.vca`), 'latin1'), k);
 });
 
 test('プリズムの成分表示と 360° 表示を相互に直せる', () => {

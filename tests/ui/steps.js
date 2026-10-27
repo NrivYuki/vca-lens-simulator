@@ -39,7 +39,7 @@ module.exports = async (t) => {
   ok(await t.eval(`${$('tolBody')}.rows.length`) === 7, '許容差の表');
 
   // 4. サンプルを順に読み込む
-  for (const s of ['frame-right', 'frame-uneven', 'frame-3d', 'frame-rimless', 'frame-both']) {
+  for (const s of ['frame-both', 'frame-right', 'frame-uneven', 'frame-3d', 'frame-rimless', '_SAMPLE0001']) {
     await set('sample', s); await t.sleep(800);
     t.log(`     ${s}: spec=${await text('spec')} / sum=${await text('sum')}`);
   }

@@ -56,7 +56,7 @@ VCA（OMA / DCS）の玉形と処方から、加工後のレンズの厚み・�
 | `drawing.js` | 三面図・断面図の SVG |
 | `vca-parser.js` | VCA の読み書き（vca-guide と同じもの） |
 | `sample-data.js` | 画面のサンプル（`samples/` と同じ内容） |
-| `samples/` | 自作の VCA サンプル（frame-rimless.vca は縁なしで DRILLE の穴・長穴を足したもの。frame-3d.vca は、5.00 D のフレームカーブに乗る立体データ（ZFMT）と処方・縁の加工のレコードを足したもの。ほかは vca-guide と同じ） |
+| `samples/` | VCA サンプル。_SAMPLE0001.vca（両眼・1440 点、鼻側と耳側の形が違う。画面ではじめに読み込む）と frame-both・frame-right・frame-uneven は vca-ptn-converter と同じ。frame-3d.vca と frame-rimless.vca は frame-both と同じ玉形に、5.00 D のフレームカーブに乗る立体データ（ZFMT）と処方・縁の加工のレコード、または縁なしの DRILLE の穴・長穴を足したもの |
 | `tests/lens.test.js` | 計算のテスト |
 | `tests/ui/` | 画面の検査（Chrome をヘッドレスで動かして操作する） |
 | `docs/test-items.md` | テスト項目の一覧と記録 |
