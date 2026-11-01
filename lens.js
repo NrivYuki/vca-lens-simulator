@@ -616,6 +616,34 @@
     return { text: lines.join('\r\n') + '\r\n', warnings };
   }
 
+  /**
+   * 網(mesh の結果)をバイナリ STL にする。parts は [[網, x のずらし量(mm)], …]。
+   * 80 バイトの見出し、三角形の数(4 バイト)、三角形ごとに法線・3 頂点(float32 × 12)と 2 バイトの属性。値は下位バイトが先。
+   * 面積が 0 の三角形(縁がヤゲンより薄く、山を細くしたところで点が重なるもの)は、法線が決まらず形にも関わらないので書かない
+   * @returns ArrayBuffer
+   */
+  function toSTL(parts) {
+    const tris = [];
+    for (const [g, dx] of parts) {
+      const P = i => [g.positions[i * 3] + dx, g.positions[i * 3 + 1], g.positions[i * 3 + 2]];
+      for (let t = 0; t < g.indices.length; t += 3) {
+        const a = P(g.indices[t]), b = P(g.indices[t + 1]), c = P(g.indices[t + 2]);
+        const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+        const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+        const l = Math.hypot(...n);
+        if (l > 1e-12) tris.push([n[0] / l, n[1] / l, n[2] / l, ...a, ...b, ...c]);
+      }
+    }
+    const buf = new ArrayBuffer(84 + tris.length * 50), dv = new DataView(buf);
+    dv.setUint32(80, tris.length, true);
+    let o = 84;
+    for (const f of tris) {
+      for (const x of f) { dv.setFloat32(o, x, true); o += 4; }
+      o += 2;
+    }
+    return buf;
+  }
+
   /** 結果を VCA の仕上がり厚みのレコード(片眼分)にする */
   function records(m) {
     const f = v => v.toFixed(2);
@@ -709,5 +737,5 @@
     return out;
   }
 
-  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, records, jobValue, thicknessVCA, opticalCenter, prismFromComponents, prismToComponents, tolerances };
+  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, toSTL, records, jobValue, thicknessVCA, opticalCenter, prismFromComponents, prismToComponents, tolerances };
 });

@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const repo = path.join(__dirname, '..');
-const TESTS = ['tests/lens.test.js', 'tests/conformance.test.js'];
+const TESTS = ['tests/lens.test.js', 'tests/conformance.test.js', 'tests/flow.test.js'];
 const L = 'lens.js';
 
 // [名前, ファイル, 元の文字列, 壊した文字列]。元の文字列はファイルの中にちょうど 1 か所あること(改行は LF で書く)
@@ -39,6 +39,8 @@ const M = [
   ['左右の違いを知らせない', L, 'if (r !== undefined && l !== undefined && r !== l) out.warnings.push', 'if (false) out.warnings.push'],
   ['眼 B の玉形をそのまま使う', L, "return Object.assign({}, t, { eye: 'R' });", 'return t;'],
   ['CIRC の左右の差を知らせない', L, 'circ.every(Number.isFinite) && Math.abs(circ[0] - circ[1]) >= 0.005', 'false'],
+  ['STL に面積 0 の三角形も書く', L, 'if (l > 1e-12) tris.push(', 'if (l >= 0) tris.push('],
+  ['STL の三角形の数を書かない', L, 'dv.setUint32(80, tris.length, true);', ''],
   ['DRILL を知らせない', L, "if (r.label === 'DRILL') out.warnings.push", 'if (false) out.warnings.push'],
 ];
 

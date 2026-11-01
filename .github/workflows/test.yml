@@ -14,11 +14,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: vca-lens-simulator
-      # 義務の番号の照合に使う
+      # 義務の番号の照合と、3 つのツールをつないだ流れのテストに使う
       - uses: actions/checkout@v4
         with:
           repository: NrivYuki/vca-guide
           path: vca-guide
+      - uses: actions/checkout@v4
+        with:
+          repository: NrivYuki/vca-shape-maker
+          path: vca-shape-maker
+      - uses: actions/checkout@v4
+        with:
+          repository: NrivYuki/vca-ptn-converter
+          path: vca-ptn-converter
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}

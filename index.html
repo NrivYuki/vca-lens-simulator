@@ -1003,22 +1003,7 @@ $('dlVca').addEventListener('click', () => job && download(`${jobName()}-thickne
 $('dlStl').addEventListener('click', () => {
   if (!job) return;
   const parts = shown().map(e => [Lens.mesh(models[e], { step: 1, rings: 48 }), eyeOffset(e)]);
-  const count = parts.reduce((s, [g]) => s + g.indices.length / 3, 0);
-  const buf = new ArrayBuffer(84 + count * 50), dv = new DataView(buf);
-  dv.setUint32(80, count, true);
-  let o = 84;
-  for (const [g, dx] of parts) {
-    const P = i => [g.positions[i * 3] + dx, g.positions[i * 3 + 1], g.positions[i * 3 + 2]];
-    for (let t = 0; t < g.indices.length; t += 3) {
-      const a = P(g.indices[t]), b = P(g.indices[t + 1]), c = P(g.indices[t + 2]);
-      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-      const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-      const l = Math.hypot(...n) || 1;
-      for (const x of [n[0] / l, n[1] / l, n[2] / l, ...a, ...b, ...c]) { dv.setFloat32(o, x, true); o += 4; }
-      o += 2;
-    }
-  }
-  download(`${jobName()}.stl`, buf, 'model/stl');
+  download(`${jobName()}.stl`, Lens.toSTL(parts), 'model/stl');
 });
 
 // ---- 入力の変更 -------------------------------------------------------------

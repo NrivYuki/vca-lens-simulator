@@ -8,9 +8,10 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test tests/lens.test.js tests/conformance.test.js",
+    "test": "node --test tests/lens.test.js tests/conformance.test.js tests/flow.test.js",
     "trace": "node tools/trace.js",
     "mutate": "node tools/mutate.js",
-    "ui": "node tests/ui/cdp.js index.html tests/ui/steps.js"
+    "ui": "node tests/ui/cdp.js index.html tests/ui/steps.js",
+    "ui:flow": "node tests/ui/cdp.js ../vca-shape-maker/index.html tests/ui/flow.js"
   }
 }

@@ -70,6 +70,7 @@ VCA(OMA / DCS)の玉形と処方から、加工後のレンズの厚み・コバ
 | `samples/` | VCA サンプル。_SAMPLE0001.vca(両眼・1440 点、鼻側と耳側の形が違う。画面ではじめに読み込む)と frame-both・frame-right・frame-uneven は vca-ptn-converter と同じ。frame-3d.vca と frame-rimless.vca は frame-both と同じ玉形に、5.00 D のフレームカーブに乗る立体データ(ZFMT)と処方・縁の加工のレコード、または縁なしの DRILLE の穴・長穴を足したもの |
 | `tests/lens.test.js` | 計算のテスト |
 | `tests/conformance.test.js`・`tests/spec.js` | VCA の読み込みと書き出しが規格(DCS v3.14)の決まりを守るかのテスト |
+| `tests/flow.test.js`・`tests/ui/flow.js` | vca-shape-maker・vca-ptn-converter とつないだ流れのテスト(隣に置いたとき) |
 | `tests/ui/` | 画面の検査(Chrome をヘッドレスで動かして操作する) |
 | `tools/trace.js` | 規格との対応の表とテストを突き合わせる |
 | `tools/mutate.js` | 実装をわざと壊し、テストが見つけるかを確かめる(ミューテーションテスト) |
@@ -96,6 +97,8 @@ node tools/trace.js --check
 ```sh
 npm run mutate
 ```
+
+vca-shape-maker・vca-ptn-converter を隣に置くと、3 つのツールをつないだ流れも確かめます(`npm test` に含まれる `tests/flow.test.js` と、画面をつなぐ `npm run ui:flow`)。shape-maker の VCA を直接、また ptn-converter で VCA・PTN・JOB・DXF に書き直してから読み込み、形・穴・JOB が保たれるかと、このツールが書き出す厚みの VCA・三面図の DXF・STL を、ほかのツールで読めるかを見ます。
 
 画面は、Chrome をヘッドレスで動かして確かめます(Node.js 22 以上、インターネット接続が必要)。リポジトリのフォルダで実行し、画像は OS の一時フォルダの vca-ui-check に置きます。
 
