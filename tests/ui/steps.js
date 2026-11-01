@@ -45,6 +45,15 @@ module.exports = async (t) => {
     await set('sample', s); await t.sleep(800);
     t.log(`     ${s}: spec=${await text('spec')} / sum=${await text('sum')}`);
   }
+  // ファイルを置く(OS からのドラッグ)。中身が VCA なら .vca・.oma・.job・.ptn のどれでも読む
+  await click('.tabs [data-pane=shape]');   // 置き場所は「玉形」のタブにある
+  const sampleText = f => require('fs').readFileSync(require('path').join(__dirname, '../../samples', f), 'latin1');
+  for (const [name, f] of [['drop.vca', 'frame-both.vca'], ['drop.oma', 'frame-right.vca'], ['DROP.JOB', 'frame-uneven.vca'], ['drop.ptn', 'frame-rimless.vca']]) {
+    await t.drop('#drop', [[name, sampleText(f)]]); await t.sleep(1200);
+    const errs = await t.eval(`[...document.querySelectorAll('#loadMsgs li.e')].length`);
+    ok((await text('src')).startsWith(name + ':') && (await text('spec')).startsWith('両眼') && !errs && await t.eval(`!!__sim.models.R && !!__sim.models.L`), `ファイルを置くと読み込む(${name}): ${await text('src')}`);
+  }
+  ok(await t.eval(`__sim.models.R.drills.length`) === 3, '置いた .ptn(縁なしの穴あり)の穴を読む');
   await set('sample', 'frame-right'); await t.sleep(800);
   ok((await text('loadMsgs')).includes('左右反転'), '右眼だけのファイルは左眼を左右反転して作ると知らせる');
   ok((await text('spec')).startsWith('両眼'), '右眼だけのファイルでも左右反転した左眼と合わせて「両眼」');
