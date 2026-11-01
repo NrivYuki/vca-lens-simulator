@@ -530,33 +530,13 @@ function results() {
   $('sum').innerHTML = `<span>中心厚　${pair(m => f(m.ct))}</span><span>最厚の縁　${pair(m => f(m.thk.t))}</span><span>最薄の縁　${pair(m => f(m.thn.t))}　<span class="unit">mm</span></span>`;
   $('resBody').innerHTML = rows.map(([label, fn]) => `<tr><td>${label}</td>${cell(fn)}</tr>`).join('') +
     '<tr><td colspan="3" class="muted left">単位 mm。後面カーブは TIND 1.53 基準 D(乱視軸の向き / 直交する向き)。ブランク径は光学中心から最も遠い縁までの 2 倍+2 mm</td></tr>';
+  // 書き出す VCA(REQ=FIL のファイル。JOB は読み込んだもの、無ければ ?)
+  const vca = Lens.thicknessVCA(models, { job: job.job, n: material().n, minCT: num('minCT', 1), minEdge: num('minEdge', 0.8), frameCurve: job.eyes.R.frameCurve });
+  $('vcaOut').value = vca.text;
   const msgs = [];
   for (const e of EYES) if (models[e]) models[e].warnings.forEach(s => msgs.push(['w', `${e === 'R' ? '右眼' : '左眼'}: ${s}`]));
+  vca.warnings.forEach(s => msgs.push(['w', 'VCA: ' + s]));
   show($('calcMsgs'), msgs);
-
-  const recs = EYES.map(e => models[e] && Lens.records(models[e]));
-  const join = k => recs.map(r => (r ? r[k] : '?')).join(';');
-  const both = fn => EYES.map(e => (models[e] ? fn(models[e]) : '?')).join(';');
-  const ETYP = { bevel: 1, flat: 2, groove: 3, mini: 4 }, BEVP = { front: 1, percent: 2, frame: 3, trace: 3, half: 4, back: 5 };
-  const p = (models.R || models.L).params;
-  const lines = [
-    `LIND=${both(() => material().n.toFixed(2))}`,
-    `FRNT=${both(m => m.base.toFixed(2))}`,
-    ...['CTHICK', 'THKP', 'THKA', 'THKR', 'THNP', 'THNA', 'THNR'].map(k => `${k}=${join(k)}`),
-    `MINCTR=${both(() => num('minCT', 1).toFixed(2))}`,
-    `MINEDG=${both(() => num('minEdge', 0.8).toFixed(2))}`,
-    `ETYP=${ETYP[p.edge]}`,
-  ];
-  if (p.edge !== 'flat') {
-    lines.push(`BEVP=${BEVP[p.bevelMode]}`);
-    if (p.bevelMode !== 'half') lines.push(`BEVM=${(p.bevelM == null ? (p.bevelMode === 'percent' ? 40 : 1) : p.bevelM).toFixed(2)}`);
-    if (p.bevelMode === 'frame') lines.push(`BEVC=${(p.bevelC == null ? (models.R || models.L).base : p.bevelC).toFixed(2)}`);
-    // Z に沿う決め方は DCS に無いので、当てはめたフレームカーブで BEVP=3 として書く
-    if (p.bevelMode === 'trace') lines.push(`BEVC=${(job.eyes.R.frameCurve ?? (models.R || models.L).base).toFixed(2)}`);
-  }
-  if (p.vShape) lines.push(`BEVANG=${(p.bevelAngle || 120).toFixed(0)}`);
-  if (p.edge === 'groove') lines.push(`GWIDTH=${both(m => m.params.grooveW.toFixed(2))}`, `GDEPTH=${both(m => m.params.grooveD.toFixed(2))}`);
-  $('vcaOut').value = lines.join('\r\n') + '\r\n';
   tolerancesTable();
 }
 

@@ -29,7 +29,7 @@ VCA(OMA / DCS)の玉形と処方から、加工後のレンズの厚み・コバ
 | 三面図 | JIS の製図に沿った A3 横の図面(尺度 2:1、第三角法、表題欄・寸法表・注記つき)。正面図・平面図・右側面図と、光学中心を通る断面 A-A・B-B。中心厚(許容差 ±0.3)、最厚・最薄のコバ、上下左右のコバ厚、玉形幅・玉形高さ、心取り点の位置の寸法入り。A3 実寸で印刷できる |
 | 許容差 | JIS T 7337(枠入り眼鏡レンズ)の後面頂点屈折力・乱視軸・プリズムインバランス・厚さ・フィッティングポイントの許容差 |
 | 結果 | 中心厚、最厚・最薄の縁(角度つき)、ベースカーブ、後面カーブ、偏心、必要なブランク径、角度ごとのコバ厚グラフ |
-| 書き出し | 画面下の帯のボタンから。3D は STL、三面図は SVG・DXF(R12、線の種類ごとの画層、一点鎖線の線種)・A3 実寸の印刷、厚みと縁の加工は VCA レコード(`CTHICK` `THKP` `THKA` `THKR` `THNP` `THNA` `THNR` `MINCTR` `MINEDG` `ETYP` `BEVP` `BEVM` `BEVC` `BEVANG` `GWIDTH` `GDEPTH`) |
+| 書き出し | 画面下の帯のボタンから。3D は STL、三面図は SVG・DXF(R12、線の種類ごとの画層、一点鎖線の線種)・A3 実寸の印刷、厚みと縁の加工は VCA ファイル(1 行目 `REQ=FIL`、2 行目 `JOB`(読み込んだファイルの JOB。無ければ `JOB=?`)に続けて `CTHICK` `THKP` `THKA` `THKR` `THNP` `THNA` `THNR` `MINCTR` `MINEDG` `ETYP` `BEVP` `BEVM` `BEVC` `BEVANG` `GWIDTH` `GDEPTH`。`ETYP` のほかは 右眼;左眼 の 2 つの値) |
 
 ## 計算のしかた
 
@@ -69,17 +69,33 @@ VCA(OMA / DCS)の玉形と処方から、加工後のレンズの厚み・コバ
 | `sample-data.js` | 画面のサンプル(`samples/` と同じ内容) |
 | `samples/` | VCA サンプル。_SAMPLE0001.vca(両眼・1440 点、鼻側と耳側の形が違う。画面ではじめに読み込む)と frame-both・frame-right・frame-uneven は vca-ptn-converter と同じ。frame-3d.vca と frame-rimless.vca は frame-both と同じ玉形に、5.00 D のフレームカーブに乗る立体データ(ZFMT)と処方・縁の加工のレコード、または縁なしの DRILLE の穴・長穴を足したもの |
 | `tests/lens.test.js` | 計算のテスト |
+| `tests/conformance.test.js`・`tests/spec.js` | VCA の読み込みと書き出しが規格(DCS v3.14)の決まりを守るかのテスト |
 | `tests/ui/` | 画面の検査(Chrome をヘッドレスで動かして操作する) |
+| `tools/trace.js` | 規格との対応の表とテストを突き合わせる |
+| `tools/mutate.js` | 実装をわざと壊し、テストが見つけるかを確かめる(ミューテーションテスト) |
 | `docs/test-items.md` | テスト項目の一覧 |
+| `docs/conformance.md` | 規格との対応(どの決まりをどう扱うか) |
 | `docs/glasses-basics.md` | 眼鏡づくりの基礎知識(工程・処方・フレーム・レンズ・装用の言葉と数値) |
 
 ## テスト
 
 ```sh
-node --test tests/lens.test.js
+npm test
 ```
 
 球面レンズの縁厚を式と比べる、プラスレンズの中心厚、乱視・偏心・プリズムの向き、網が閉じていて体積が合うこと、サンプルの読み込みを確かめます。
+
+VCA の読み込みと厚みの書き出しが規格の決まりを守るか(ファイルの 1・2 行目、JOB、左右のレコードの値の数、DRILLE の誤りの扱い、眼 B の玉形など)は、`tests/conformance.test.js` で確かめます。どの決まりをどのテストが確かめているかは [docs/conformance.md](docs/conformance.md) と [docs/conformance-tests.md](docs/conformance-tests.md) にあります。次のコマンドで突き合わせ、テストの無い決まりがあれば失敗します(GitHub Actions でも動かします)。
+
+```sh
+node tools/trace.js --check
+```
+
+テストが確かめているはずの処理を本当に確かめているかは、実装をわざと壊して試します(壊し方の一覧は `tools/mutate.js` にあり、1 つでもテストが通ってしまえば失敗します)。
+
+```sh
+npm run mutate
+```
 
 画面は、Chrome をヘッドレスで動かして確かめます(Node.js 22 以上、インターネット接続が必要)。リポジトリのフォルダで実行し、画像は OS の一時フォルダの vca-ui-check に置きます。
 

@@ -88,15 +88,28 @@
     const d = VCA.parse(text);
     const out = { eyes: {}, rec: d.rec, warnings: d.warnings.slice(), errors: d.errors.slice() };
     const num = (label, eye) => VCA.sideNumber(d.rec[label], eye);
+    out.job = VCA.sideValue(d.rec.JOB, 'R');
     out.dbl = num('DBL', 'R');
-    out.fcrv = num('FCRV', 'R');
     out.etyp = num('ETYP', 'R');
+    // 左右のレコード(A.1.1.3)のうち、画面では両眼に 1 つの値だけを使うもの。右眼の値を使い、右眼が無ければ左眼の値。
+    // 左右で違えば知らせる(値が 1 つなら両眼の値として読む。5.1)
+    const one = label => {
+      const r = num(label, 'R'), l = num(label, 'L');
+      if (r !== undefined && l !== undefined && r !== l) out.warnings.push(`${label} が左右で違います(${r} / ${l})。両眼に右眼の値を使います`);
+      return r ?? l;
+    };
+    out.fcrv = one('FCRV');
     // 縁の加工(DCS の Table A.1)。値が無いものは undefined
     out.edging = {
-      bevp: num('BEVP', 'R'), bevm: num('BEVM', 'R'), bevc: num('BEVC', 'R'), bevang: num('BEVANG', 'R'),
-      gdepth: num('GDEPTH', 'R'), gwidth: num('GWIDTH', 'R'),
+      bevp: one('BEVP'), bevm: one('BEVM'), bevc: one('BEVC'), bevang: one('BEVANG'),
+      gdepth: one('GDEPTH'), gwidth: one('GWIDTH'),
     };
-    const traces = d.traces.filter(t => t.radii.length);
+    // データの玉形の眼は R か L(B は要求・初期化だけ。5.4.12.3)。B のものは右眼として扱う
+    const traces = d.traces.filter(t => t.radii.length).map(t => {
+      if (t.eye === 'R' || t.eye === 'L') return t;
+      out.warnings.push(`TRCFMT の眼が「${t.eye}」なので、右眼として扱います`);
+      return Object.assign({}, t, { eye: 'R' });
+    });
     for (const eye of ['R', 'L']) {
       let t = traces.find(t => t.eye === eye), mirrored = false;
       if (!t) { t = traces.find(t => t.eye === (eye === 'R' ? 'L' : 'R')) || traces[0]; mirrored = !!t; }
@@ -120,6 +133,12 @@
       };
     }
     if (!out.eyes.R) out.errors.push('玉形(TRCFMT と R)が見つかりません');
+    // 片眼の玉形で CIRC の左右が違えば、その差は反対の眼の大きさの変更(CSIZ)とみなす決まり(5.4.9.4)。
+    // このツールは反対の眼を左右反転で作るだけで大きさは変えないので、知らせる
+    const circ = ['R', 'L'].map(e => num('CIRC', e));
+    if (out.eyes.R && (out.eyes.R.mirrored || (out.eyes.L && out.eyes.L.mirrored)) && circ.every(Number.isFinite) && Math.abs(circ[0] - circ[1]) >= 0.005) {
+      out.warnings.push(`片眼の玉形で CIRC の左右が違います(${circ.map(v => v.toFixed(2)).join(' / ')})。規格では差を反対の眼の大きさの変更とみなしますが、反対の眼は左右反転で作るだけで、大きさは変えません`);
+    }
     // 穴あけ(DCS 5.5 の DRILLE。1 レコードが 1 か所)
     out.drills = [];
     for (const r of d.records) {
@@ -128,6 +147,12 @@
       const f = parseDrill(r.fields);
       if (f.error) out.warnings.push(`DRILLE=${r.fields.join(';')}: ${f.error}`);
       else if (f.side !== '0') out.drills.push(f);
+    }
+    // 1 つのパケットの DRILLE はすべて同じ基準(5.5.1.5)。混ざっていれば、どれが正しいか決められないので描かない
+    const refs = [...new Set(out.drills.map(f => f.ref))];
+    if (refs.length > 1) {
+      out.warnings.push(`DRILLE の基準が混ざっています(${refs.join('・')})。規格では 1 つのデータの穴はすべて同じ基準なので、穴は描きません`);
+      out.drills = [];
     }
     return out;
   }
@@ -143,8 +168,12 @@
     const n = i => { const x = v(i); return x === undefined || !/^[+-]?(\d+\.?\d*|\.\d+)$/.test(x) ? undefined : +x; };
     const side = (v(0) || '').toUpperCase();
     if (!['R', 'L', 'B', '0'].includes(side)) return { error: '1 番目の欄(眼)が R・L・B・0 ではありません' };
+    if (side === '0') return { side: '0' };
+    // 基準の欄は、空なら C(箱中心)とみなすが、不明(?)にも省略にもしてはならない(5.5.2.2)
+    if (fields[1] === undefined) return { error: '2 番目の欄(基準)がありません' };
+    if (fields[1].trim() === '?') return { error: '2 番目の欄(基準)が不明(?)です' };
     const ref = (v(1) || 'C').toUpperCase();
-    if (side === '0' || ref === '0') return { side: '0' };
+    if (ref === '0') return { side: '0' };
     const m = ref.match(/^([CEBR])([NT])?([FR])?$/);
     if (!m || ((m[1] === 'E' || m[1] === 'B') && !m[2])) return { error: `2 番目の欄(基準)「${ref}」が読めません` };
     if (m[1] === 'R') return { error: 'グループの中の相対位置(R)には対応していません' };
@@ -535,6 +564,58 @@
     };
   }
 
+  /**
+   * JOB の値(DCS の limited 型)。空か ? なら不明値 ?(表 A.2 の JOB)。
+   * limited は ASCII 12 文字まで(5.1.8.3)。文字は 32-127 で ; を除く(5.1.8.1。制御文字は 32 未満の文字、3.2.12)。
+   * 予約文字(表 1 の = , * ? |)は区切りなどの役割にだけ使う(5.1.7.2)ので値に入れない。
+   */
+  function jobValue(job) {
+    const s = String(job ?? '').trim();
+    if (s === '' || s === '?') return '?';
+    if (s.length > 12) throw new Error(`JOB は 12 文字までです(いま ${s.length} 文字)`);
+    if (/[^\x20-\x7f]/.test(s)) throw new Error('JOB には半角の英数字と記号だけを使えます');
+    const bad = s.match(/[;=,*?|]/);
+    if (bad) throw new Error(`JOB に「${bad[0]}」は使えません(区切りなどに使う文字です)`);
+    return s;
+  }
+
+  const ETYP_CODE = { bevel: 1, flat: 2, groove: 3, mini: 4 };
+  const BEVP_CODE = { front: 1, percent: 2, frame: 3, trace: 3, half: 4, back: 5 };
+
+  /**
+   * 計算の結果を VCA ファイル(REQ=FIL)にする。
+   * 1 行目は REQ、2 行目は JOB(7.5.4)。左右のレコードは右眼;左眼の 2 つの値で、計算していない眼は ?(5.1.4・A.1.1.3)。
+   * @param models { R?, L? }  build の結果
+   * @param o { job(読み込んだ JOB。無ければ ?), n(屈折率), minCT, minEdge, frameCurve(Z に沿わせるときの BEVC) }
+   * @returns {{ text: string, warnings: string[] }}
+   */
+  function thicknessVCA(models, o) {
+    const warnings = [], f2 = v => v.toFixed(2);
+    const both = fn => ['R', 'L'].map(e => (models[e] ? fn(models[e]) : '?')).join(';');
+    let job = '?';
+    try { job = jobValue(o.job); } catch (e) { warnings.push(`読み込んだ JOB「${o.job}」は規格に合わない(${e.message})ので、JOB=? と書きます`); }
+    const m0 = models.R || models.L, p = m0.params;
+    const lines = [
+      'REQ=FIL', `JOB=${job}`,
+      `LIND=${both(() => f2(o.n))}`,
+      `FRNT=${both(m => f2(m.base))}`,
+      ...['CTHICK', 'THKP', 'THKA', 'THKR', 'THNP', 'THNA', 'THNR'].map(k => `${k}=${both(m => records(m)[k])}`),
+      `MINCTR=${both(() => f2(o.minCT))}`,
+      `MINEDG=${both(() => f2(o.minEdge))}`,
+      `ETYP=${ETYP_CODE[p.edge]}`,
+    ];
+    if (p.edge !== 'flat') {
+      lines.push(`BEVP=${both(() => BEVP_CODE[p.bevelMode])}`);
+      if (p.bevelMode !== 'half') lines.push(`BEVM=${both(() => f2(p.bevelM == null ? (p.bevelMode === 'percent' ? 40 : 1) : p.bevelM))}`);
+      if (p.bevelMode === 'frame') lines.push(`BEVC=${both(() => f2(p.bevelC == null ? m0.base : p.bevelC))}`);
+      // Z に沿う決め方は DCS に無いので、当てはめたフレームカーブで BEVP=3 として書く
+      if (p.bevelMode === 'trace') lines.push(`BEVC=${both(() => f2(o.frameCurve ?? m0.base))}`);
+    }
+    if (p.vShape) lines.push(`BEVANG=${both(() => (p.bevelAngle || 120).toFixed(0))}`);
+    if (p.edge === 'groove') lines.push(`GWIDTH=${both(m => f2(m.params.grooveW))}`, `GDEPTH=${both(m => f2(m.params.grooveD))}`);
+    return { text: lines.join('\r\n') + '\r\n', warnings };
+  }
+
   /** 結果を VCA の仕上がり厚みのレコード(片眼分)にする */
   function records(m) {
     const f = v => v.toFixed(2);
@@ -628,5 +709,5 @@
     return out;
   }
 
-  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, records, opticalCenter, prismFromComponents, prismToComponents, tolerances };
+  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, records, jobValue, thicknessVCA, opticalCenter, prismFromComponents, prismToComponents, tolerances };
 });

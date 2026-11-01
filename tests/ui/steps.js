@@ -27,7 +27,9 @@ module.exports = async (t) => {
   await t.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowLeft', bubbles:true}))`);
   await t.eval(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key:'ArrowLeft', bubbles:true}))`);
   ok(await visiblePanes() === 'pane-vca', '左矢印キーで前のタブ(端から最後へ回る)');
-  ok((await t.eval(`${$('vcaOut')}.value`)).includes('CTHICK='), 'VCA のタブに厚みのレコードが出る');
+  const out = await t.eval(`${$('vcaOut')}.value`);
+  ok(/^REQ=FIL\r?\nJOB=[^\r\n]+\r?\n/.test(out), 'VCA のタブの中身は REQ=FIL・JOB で始まる: ' + JSON.stringify(out.slice(0, 30)));
+  ok(/\nCTHICK=\d+\.\d\d;\d+\.\d\d\r?\n/.test(out) && /\nBEVM=\d+\.\d\d;\d+\.\d\d\r?\n/.test(out), 'VCA のタブの厚み・縁の加工は 右眼;左眼 の 2 つの値');
   await t.shot('02-tab-vca');
 
   // 3. 結果のタブ(隠れていたグラフが描けているか)

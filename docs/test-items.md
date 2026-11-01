@@ -1,12 +1,16 @@
 # テスト項目
 
-このツールで確かめている項目の一覧です。計算は `tests/lens.test.js`、画面は `tests/ui/` で自動で確かめます。自動にできないものは「手で確かめる項目」に残します。
+このツールで確かめている項目の一覧です。計算は `tests/lens.test.js`、画面は `tests/ui/` で自動で確かめます。自動にできないものは「手で確かめる項目」に残します。VCA の読み込みと書き出しが規格(DCS v3.14)の決まりを守るかのテスト(`tests/conformance.test.js`)は、決まりごとに [conformance.md](conformance.md) にまとめています。
 
 ## 動かし方
 
 ```
-node --test tests/lens.test.js
+npm test
+node tools/trace.js --check
+npm run mutate
 ```
+
+- `npm test` は計算のテストと規格のテストを動かします。`tools/trace.js --check` は、[conformance.md](conformance.md) の「テスト」の決まりにテストがあるか、[conformance-tests.md](conformance-tests.md) が古くないかを確かめます(作り直すときは `npm run trace`)。`npm run mutate` は、`tools/mutate.js` の一覧のとおりに実装をわざと壊し、そのたびにテストが失敗するか(壊れたことを見つけるか)を確かめます。
 
 ```
 node tests/ui/cdp.js index.html tests/ui/steps.js
@@ -41,7 +45,7 @@ node tests/ui/cdp.js index.html tests/ui/steps.js
 | 上の帯 | 読み込むと「両眼 / 玉形 幅×高さ / DBL / 素材 / 縁の加工」が出る。縁の加工・DBL を変えると変わる |
 | 下の帯 | 中心厚・最厚の縁・最薄の縁が右眼・左眼で出る。単位 mm が同じ行に収まる |
 | タブ | はじめは「玉形」だけ見える。6 つのタブを押すとその面だけ見え、選んだタブの印が付く。左右の矢印キーで切り替わり、端から反対の端へ回る。Tab キーで止まるのは選んだタブだけで、各タブが中身の面と結び付いている(aria-controls・aria-labelledby) |
-| 隠れたタブの中身 | 結果のタブを開くと左右のグラフと表がある。許容差の表が 7 行。VCA のタブに `CTHICK=` を含むレコード |
+| 隠れたタブの中身 | 結果のタブを開くと左右のグラフと表がある。許容差の表が 7 行。VCA のタブの中身は `REQ=FIL`・`JOB` で始まり、`CTHICK`・`BEVM` は 右眼;左眼 の 2 つの値 |
 | サンプル | はじめに `_SAMPLE0001`(1440 点)を読み込む。6 つのサンプルを順に読み込んでも例外が出ない。右眼だけのファイルは「左右反転して使う」と知らせ、両眼として表示する |
 | 眼の切り替え | 右眼だけ・両眼を切り替えられる |
 | 縁の加工 | ヤゲン・ミニヤゲン・溝・平で、関係する入力行だけが見える。位置の決め方 5 種類を切り替えても例外が出ない |
