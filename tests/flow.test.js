@@ -70,9 +70,11 @@ for (const c of CASES) {
       const text = Conv.toVCA(set, { n: c.n, job: set.job, dbl: set.dbl, keepRecords }).text;
       sameAsShape(Lens.fromVCA(text), v, c, `VCA・引き継ぎ ${keepRecords}`);
     }
+    // DXF を読み込み直し、画面と同じく点数は自動(Converter.autoPoints)、JOB の欄は空のまま VCA にする
     const fromDxf = Conv.fromDXF(Conv.toDXF(set, { dbl: set.dbl }));
     assert.deepEqual(fromDxf.errors, []);
-    const d = Lens.fromVCA(Conv.toVCA(fromDxf, { n: c.n, dbl: fromDxf.dbl }).text);
+    assert.equal(Conv.autoPoints(fromDxf), c.n, 'DXF から VCA に戻すときの点数の自動は、元の点数');
+    const d = Lens.fromVCA(Conv.toVCA(fromDxf, { n: Conv.autoPoints(fromDxf), job: '', dbl: fromDxf.dbl }).text);
     sameAsShape(d, v, c, 'DXF → VCA', { job: false });
     assert.equal(d.job, undefined, 'DXF には JOB が無いので JOB=?');
   });

@@ -12,6 +12,10 @@ module.exports = async (t) => {
   ok((await text('spec')).startsWith('両眼 / 玉形'), '上の帯に条件が出る: ' + await text('spec'));
   ok((await text('sum')).includes('中心厚'), '下の帯に結果が出る: ' + await text('sum'));
   ok(await visiblePanes() === 'pane-shape', 'はじめは玉形のタブだけ見える');
+  ok((await t.eval(`${$('shade')}.value`)) === 'solid' && (await t.eval(`getComputedStyle(${$('legend')}).display`)) === 'none', 'はじめの 3D の表示は単色で、厚みの凡例は出ない');
+  await set('shade', 'heat');
+  ok((await t.eval(`getComputedStyle(${$('legend')}).display`)) !== 'none', '厚みの色分けにすると凡例が出る');
+  await set('shade', 'solid');
   await t.shot('01-start');
 
   // 2. タブ
@@ -98,7 +102,13 @@ module.exports = async (t) => {
   for (const r of ['cell', '', 'metal']) { await set('rim', r); await t.sleep(300); await t.shot('06-rim-' + (r || 'none')); }
 
   // 7. 断面・ヤゲン確認・装用状態
-  for (const c of ['h', 'v', 'radial', '']) { await set('clip', c); await t.sleep(300); }
+  // 断面のスライダーの値の箱: 水平・垂直は位置(mm)、周は方位角(度)、なしなら — でスライダーは押せない
+  const clipVal = { h: /^-?\d+\.\d mm$/, v: /^-?\d+\.\d mm$/, radial: /^\d+°$/, '': /^—$/ };
+  for (const c of ['h', 'v', 'radial', '']) {
+    await set('clip', c); await t.sleep(300);
+    const shown = await text('clipVal'), off = await t.eval(`${$('clipPos')}.disabled`);
+    ok(clipVal[c].test(shown) && off === (c === ''), `断面 ${c || 'なし'}: 値の箱 ${shown}・スライダー ${off ? '無効' : '有効'}`);
+  }
   await t.shot('07-clip-off');
   await click('#bevelSpin'); await t.sleep(1200); await t.shot('07-bevelspin'); await click('#bevelSpin');
   await t.eval(`(() => { const e = ${$('worn')}; e.checked = true; e.dispatchEvent(new Event('change', {bubbles:true})); })()`); await t.sleep(300);
@@ -108,6 +118,15 @@ module.exports = async (t) => {
   // 8. 三面図
   await click('#tab2d'); await t.sleep(800);
   ok(await t.eval(`!!${$('sheet')}.querySelector('svg')`), '三面図が描ける');
+  // 印刷: 新しい窓の代わりに枠(iframe)を渡し、印刷に進んだときに図面の書体(BIZ UDPゴシック)が読み込まれているか
+  const pr = await t.eval(`new Promise(res => {
+    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;left:-5000px;width:800px;height:600px'; document.body.appendChild(f);
+    const w = f.contentWindow, open = window.open;
+    w.print = () => { window.open = open; res({ font: w.document.fonts.check("400 3px 'BIZ UDPGothic'") && [...w.document.fonts].some(x => x.family === 'BIZ UDPGothic' && x.status === 'loaded'), svg: !!w.document.querySelector('svg text') }); f.remove(); };
+    window.open = () => w;
+    document.getElementById('print').click();
+  })`);
+  ok(pr.font && pr.svg, `印刷は図面の書体を読み込んでから進む(書体 ${pr.font}・図面 ${pr.svg})`);
   ok(await t.eval(`getComputedStyle(document.querySelector('.g2d')).display !== 'none'`), '三面図のときは表示の倍率が見える');
   await t.shot('08-2d');
   await click('#tab3d'); await t.sleep(500);

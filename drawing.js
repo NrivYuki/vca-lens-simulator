@@ -291,7 +291,7 @@
     const B = ([y, z]) => [L.bbLeft + s * (zmax - z), L.frontTop + s * (by1 - y)];  // 断面 B-B(右から見る)
 
     const out = [];
-    out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SHEET.W} ${SHEET.H}" width="${SHEET.W}mm" height="${SHEET.H}mm" class="drawing" font-family="'BIZ UDPGothic', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif">`);
+    out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SHEET.W} ${SHEET.H}" width="${SHEET.W}mm" height="${SHEET.H}mm" class="drawing" font-family="'BIZ UDPGothic', 'BIZ UDPゴシック', 'Hiragino Sans', 'Yu Gothic', sans-serif">`);
     out.push(`<defs><pattern id="hatch" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="ht" x1="0" y1="0" x2="0" y2="1.5" stroke-width="${LW.thin}"/></pattern></defs>`);
     out.push(`<rect class="paper" x="0" y="0" width="${SHEET.W}" height="${SHEET.H}"/>`);
 

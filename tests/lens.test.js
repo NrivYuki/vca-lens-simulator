@@ -90,7 +90,8 @@ test('VCA のサンプルから両眼の玉形を読み込める', () => {
   const text = fs.readFileSync(path.join(__dirname, '../samples/frame-both.vca'), 'latin1');
   const d = Lens.fromVCA(text);
   assert.deepStrictEqual(d.errors, []);
-  near(d.eyes.R.hbox, 52.27, 0.05); near(d.eyes.R.vbox, 38.45, 0.05);
+  // ファイルの HBOX・VBOX(52.00・45.85)
+  near(d.eyes.R.hbox, 52.00, 0.05); near(d.eyes.R.vbox, 45.85, 0.05);
   assert.strictEqual(d.dbl, 18);
   assert.strictEqual(d.eyes.R.rx.ipd, 31.5);
   assert.strictEqual(d.eyes.L.rx.ipd, 31);
@@ -290,4 +291,17 @@ test('フレーム基準: 縁の面を立てる回転は長さを保ち、光学
   const svg = Drawing.threeView(m, { eye: 'R', title: 'テスト' });
   assert.ok(!/NaN|Infinity/.test(svg), '数値に NaN・Infinity が無い');
   assert.ok(svg.includes('フレーム基準'), '注記にフレーム基準と書く');
+});
+
+test('保存名: 読み込んだ JOB を Windows で使える名前にする(無い・? は lens、使えない文字は _、予約された名前は先頭に _)', () => {
+  assert.equal(Lens.fileStem(undefined, 'lens'), 'lens');
+  assert.equal(Lens.fileStem('?', 'lens'), 'lens');
+  assert.equal(Lens.fileStem('FLOW1', 'lens'), 'FLOW1');
+  assert.equal(Lens.fileStem('A/B:C', 'lens'), 'A_B_C');
+  assert.equal(Lens.fileStem('AB. ', 'lens'), 'AB');
+  assert.equal(Lens.fileStem('NUL', 'lens'), '_NUL');
+  // DXF から作った VCA(JOB=?)を読んだときの保存名
+  const d = Lens.fromVCA('REQ=FIL\r\nJOB=?\r\nTRCFMT=1;4;E;R;F\r\nR=2500;2500;2500;2500\r\n');
+  assert.equal(d.job, undefined);
+  assert.equal(Lens.fileStem(d.job, 'lens'), 'lens');
 });

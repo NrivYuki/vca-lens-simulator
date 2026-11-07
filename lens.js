@@ -579,6 +579,27 @@
     return s;
   }
 
+  // Windows で使えない名前(拡張子が付いていても使えない)
+  const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i;
+
+  /**
+   * 保存するファイルの名前(拡張子を除く)。読み込んだ JOB を、Windows や USB メモリ(FAT32)で使える名前にする。
+   * JOB が無いか不明値 ?(表 A.2 の JOB)なら fallback。使えない文字は「_」に、制御文字は取り除き、最後の「.」と空白を削る。
+   * 予約された名前は先頭に「_」を付ける(vca-ptn-converter の保存名と同じ決まり)
+   */
+  function fileStem(job, fallback) {
+    if (String(job ?? '').trim() === '?') return fallback || 'lens';
+    let t = String(job ?? '')
+      .replace(/[\x00-\x1f\x7f]/g, '')
+      .trim()
+      .replace(/[.\s]+$/, '')
+      .slice(0, 100)
+      .replace(/[.\s]+$/, '')
+      .replace(/[\\/:*?"<>|\s]+/g, '_');
+    if (RESERVED.test(t)) t = '_' + t;
+    return t || fallback || 'lens';
+  }
+
   const ETYP_CODE = { bevel: 1, flat: 2, groove: 3, mini: 4 };
   const BEVP_CODE = { front: 1, percent: 2, frame: 3, trace: 3, half: 4, back: 5 };
 
@@ -737,5 +758,5 @@
     return out;
   }
 
-  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, toSTL, records, jobValue, thicknessVCA, opticalCenter, prismFromComponents, prismToComponents, tolerances };
+  return { TIND, MATERIALS, resample, radiusAt, fromVCA, sagAt, fitFrameCurve, parseDrill, placeDrills, sagSphere, sagBiconic, autoBase, build, edgeProfile, edgePlane, mesh, toSTL, records, jobValue, fileStem, thicknessVCA, opticalCenter, prismFromComponents, prismToComponents, tolerances };
 });

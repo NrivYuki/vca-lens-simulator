@@ -23,13 +23,13 @@ VCA(OMA / DCS)の玉形と処方から、加工後のレンズの厚み・コバ
 | 画面 | 内容 |
 |---|---|
 | 3D | フレーム基準で表示する(縁の面をまっすぐ立て、光学中心を玉形中心からずらしたぶん光軸のほうを傾ける。三面図も同じ向き)。ドラッグで回転、右ドラッグで移動、ホイールで拡大。正面・上・右・左・下・背面・斜めへの切り替え、平行投影。装用状態(前傾角・そり角でレンズを傾けて表示)。ヤゲン確認(レンズをほぼ真横=エッジオンに立て、光軸まわりに回す。コバ断面が縦帯で見え、縁の全周が順に流れて各位置のヤゲンを確認できる)、レンズを回す(視点を固定しドラッグでレンズ自体を回し、縁のヤゲンの立ち方を見る)。視点ボタンはレンズの傾きを保ったまま向きを変えるので、傾けたまま正面・上などから見られる。「傾きを戻す」でレンズの回転だけを 0° に戻す(装用状態の傾きはそのまま) |
-| 表示 | 厚みの色分け、単色、半透明。稜線の表示。リム(メタル・セル・なし。ライトモードは黒、ダークモードは白) |
+| 表示 | 単色(既定)、厚みの色分け、半透明。稜線の表示。リム(メタル・セル・なし。ライトモードは黒、ダークモードは白) |
 | 断面 | 水平(A-A)・垂直(B-B)の切断面をスライダーで動かす。切り口は色で塗る。周(コバ・ヤゲン): レンズ中心を通る子午断面を方位角(0-360°)で回し、各角度のコバ断面(前面カーブ・ヤゲンの山・後面カーブ)でヤゲンの立ち方を全周で確かめる |
 | 測る | レンズをクリックすると、その点の厚み(縁ならコバ厚と角度)を表示 |
 | 三面図 | JIS の製図に沿った A3 横の図面(尺度 2:1、第三角法、表題欄・寸法表・注記つき)。正面図・平面図・右側面図と、光学中心を通る断面 A-A・B-B。中心厚(許容差 ±0.3)、最厚・最薄のコバ、上下左右のコバ厚、玉形幅・玉形高さ、心取り点の位置の寸法入り。A3 実寸で印刷できる |
 | 許容差 | JIS T 7337(枠入り眼鏡レンズ)の後面頂点屈折力・乱視軸・プリズムインバランス・厚さ・フィッティングポイントの許容差 |
 | 結果 | 中心厚、最厚・最薄の縁(角度つき)、ベースカーブ、後面カーブ、偏心、必要なブランク径、角度ごとのコバ厚グラフ |
-| 書き出し | 画面下の帯のボタンから。3D は STL、三面図は SVG・DXF(R12、線の種類ごとの画層、一点鎖線の線種)・A3 実寸の印刷、厚みと縁の加工は VCA ファイル(1 行目 `REQ=FIL`、2 行目 `JOB`(読み込んだファイルの JOB。無ければ `JOB=?`)に続けて `CTHICK` `THKP` `THKA` `THKR` `THNP` `THNA` `THNR` `MINCTR` `MINEDG` `ETYP` `BEVP` `BEVM` `BEVC` `BEVANG` `GWIDTH` `GDEPTH`。`ETYP` のほかは 右眼;左眼 の 2 つの値) |
+| 書き出し | 画面下の帯のボタンから。3D は STL、三面図は SVG・DXF(R12、線の種類ごとの画層、一点鎖線の線種)・A3 実寸の印刷、厚みと縁の加工は VCA ファイル(1 行目 `REQ=FIL`、2 行目 `JOB`(読み込んだファイルの JOB。無ければ `JOB=?`)に続けて `CTHICK` `THKP` `THKA` `THKR` `THNP` `THNA` `THNR` `MINCTR` `MINEDG` `ETYP` `BEVP` `BEVM` `BEVC` `BEVANG` `GWIDTH` `GDEPTH`。`ETYP` のほかは 右眼;左眼 の 2 つの値)。保存する名前は読み込んだ JOB(無いか `?` なら `lens`)に `-thickness.vca`・`-R.svg` などを付けたもので、Windows で使えない文字は `_` にする |
 
 ## 計算のしかた
 
@@ -67,7 +67,7 @@ VCA(OMA / DCS)の玉形と処方から、加工後のレンズの厚み・コバ
 | `vca-parser.js` | VCA の読み書き(vca-guide と同じもの) |
 | `vca-records.js` | DCS v3.14 附属書 A のラベル定義表(vca-guide と同じもの。vca-parser.js が使う) |
 | `sample-data.js` | 画面のサンプル(`samples/` と同じ内容) |
-| `samples/` | VCA サンプル。_SAMPLE0001.vca(両眼・1440 点、鼻側と耳側の形が違う。画面ではじめに読み込む)と frame-both・frame-right・frame-uneven は vca-ptn-converter と同じ。frame-3d.vca と frame-rimless.vca は frame-both と同じ玉形に、5.00 D のフレームカーブに乗る立体データ(ZFMT)と処方・縁の加工のレコード、または縁なしの DRILLE の穴・長穴を足したもの |
+| `samples/` | VCA サンプル。_SAMPLE0001.vca(両眼・1440 点、鼻側と耳側の形が違う。画面ではじめに読み込む)と frame-both・frame-right・frame-uneven は vca-guide・vca-ptn-converter と同じ(frame-* は _SAMPLE0001 と同じ玉形を 360 点・不等角度の 180 点で表したもの)。frame-3d.vca と frame-rimless.vca は frame-both と同じ玉形に、5.00 D のフレームカーブに乗る立体データ(ZFMT)と処方・縁の加工のレコード、または縁なしの DRILLE の穴・長穴を足したもの |
 | `tests/lens.test.js` | 計算のテスト |
 | `tests/conformance.test.js`・`tests/spec.js` | VCA の読み込みと書き出しが規格(DCS v3.14)の決まりを守るかのテスト |
 | `tests/flow.test.js`・`tests/ui/flow.js` | vca-shape-maker・vca-ptn-converter とつないだ流れのテスト(隣に置いたとき) |
@@ -98,7 +98,7 @@ node tools/trace.js --check
 npm run mutate
 ```
 
-vca-shape-maker・vca-ptn-converter を隣に置くと、3 つのツールをつないだ流れも確かめます(`npm test` に含まれる `tests/flow.test.js` と、画面をつなぐ `npm run ui:flow`)。shape-maker の VCA を直接、また ptn-converter で VCA・PTN・JOB・DXF に書き直してから読み込み、形・穴・JOB が保たれるかと、このツールが書き出す厚みの VCA・三面図の DXF・STL を、ほかのツールで読めるかを見ます。
+vca-shape-maker・vca-ptn-converter を隣に置くと、3 つのツールをつないだ流れも確かめます(`npm test` に含まれる `tests/flow.test.js` と、画面をつなぐ `npm run ui:flow`)。shape-maker の VCA を直接、また ptn-converter で VCA・PTN・JOB・DXF に書き直してから(DXF は VCA に戻してから)読み込み、形・穴・JOB が保たれるかと、このツールが書き出す厚みの VCA・三面図の DXF・STL を、ほかのツールで読めるかを見ます。
 
 画面は、Chrome をヘッドレスで動かして確かめます(Node.js 22 以上、インターネット接続が必要)。リポジトリのフォルダで実行し、画像は OS の一時フォルダの vca-ui-check に置きます。
 
