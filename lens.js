@@ -105,7 +105,14 @@
       gdepth: one('GDEPTH'), gwidth: one('GWIDTH'),
     };
     // データの玉形の眼は R か L(B は要求・初期化だけ。5.4.12.3)。B のものは右眼として扱う
-    const traces = d.traces.filter(t => t.radii.length).map(t => {
+    // 角度や半径を読めない玉形(角度のモードが E でも U でもないのに A が無いなど)は使わない。点が数にならず、形を作れないため
+    const usable = t => {
+      const p = VCA.tracePoints(t, 'R');
+      if (p.length >= 3 && p.every(q => Number.isFinite(q.x) && Number.isFinite(q.y))) return true;
+      out.errors.push(`TRCFMT=${[t.fmt, t.radii.length, t.mode, t.eye].join(';')} の玉形は、角度か半径を読めないので使いません`);
+      return false;
+    };
+    const traces = d.traces.filter(t => t.radii.length && usable(t)).map(t => {
       if (t.eye === 'R' || t.eye === 'L') return t;
       out.warnings.push(`TRCFMT の眼が「${t.eye}」なので、右眼として扱います`);
       return Object.assign({}, t, { eye: 'R' });

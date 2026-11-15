@@ -305,3 +305,12 @@ test('保存名: 読み込んだ JOB を Windows で使える名前にする(無
   assert.equal(d.job, undefined);
   assert.equal(Lens.fileStem(d.job, 'lens'), 'lens');
 });
+
+test('角度か半径を読めない玉形(角度のモードが E でも U でもなく、A も無い)は使わず、誤りとして知らせる', () => {
+  const r = Array(360).fill(2400).join(';');
+  const job = Lens.fromVCA(`REQ=FIL\r\nJOB=X\r\nTRCFMT=1;360;X;R;F\r\nR=${r}\r\n`);
+  assert.equal(job.eyes.R, undefined);
+  assert.ok(job.errors.some(e => e.includes('角度か半径を読めない')), job.errors.join(' / '));
+  const ok = Lens.fromVCA(`REQ=FIL\r\nJOB=X\r\nTRCFMT=1;360;X;R;F\r\nR=${r}\r\nTRCFMT=1;360;E;L;F\r\nR=${r}\r\n`);
+  assert.ok(ok.eyes.L && ok.eyes.R && ok.eyes.R.mirrored, '読める左眼から右眼を作る');
+});
